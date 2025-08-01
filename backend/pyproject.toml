@@ -20,6 +20,10 @@ dependencies = [
     "google-genai",
     "tiktoken>=0.8.0",
     "firecrawl-py>=2.7.0",
+    "httpx",
+    "python-dotenv",
+    "uvicorn",
+    "beautifulsoup4"
 ]
 
 
@@ -58,4 +62,8 @@ convention = "google"
 dev = [
     "langgraph-cli[inmem]>=0.1.71",
     "pytest>=8.3.5",
+    "httpx",
+    "python-dotenv",
+    "uvicorn",
+    "beautifulsoup4"
 ]

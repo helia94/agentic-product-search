@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Unified Search Demo</title>
+    <!-- Tailwind via CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+  </head>
+  <body class="bg-gray-50 min-h-screen flex flex-col items-center p-6">
+    <h1 class="text-3xl font-bold mb-4">Unified Search</h1>
+
+    <!-- Query box -->
+    <div class="w-full max-w-2xl flex gap-2 mb-6">
+      <input
+        id="queryInput"
+        type="text"
+        class="flex-1 p-3 rounded-xl shadow border border-gray-300 focus:outline-none"
+        placeholder="Ask me anything…"
+      />
+      <button
+        id="searchBtn"
+        class="px-6 py-3 rounded-xl bg-blue-600 text-white font-semibold shadow hover:bg-blue-700 transition"
+      >
+        Search
+      </button>
+    </div>
+
+    <!-- Tabs -->
+    <div class="w-full max-w-5xl">
+      <div id="tabs" class="flex border-b mb-4 overflow-x-auto"></div>
+      <div id="panels" class="bg-white rounded-xl shadow p-4 min-h-[300px]"></div>
+    </div>
+
+    <!-- Saved queries (localStorage) -->
+    <div class="w-full max-w-2xl mt-10">
+      <h2 class="text-xl font-semibold mb-2">Saved searches</h2>
+      <ul id="historyList" class="space-y-1 text-blue-700 underline cursor-pointer"></ul>
+    </div>
+
+    <script>
+      const MODELS = [
+        "exa_search",
+        "exa_answer",
+        "google_custom",
+        "gemini_search",
+        "openai_search",
+        "openai_gpt41_mini",
+        "deepseek_llama_groq",
+        "grok3_mini",
+        "browser",
+      ];
+
+      const API_HOST = "http://127.0.0.1:8000";
+      const queryInput = document.getElementById("queryInput");
+      const searchBtn = document.getElementById("searchBtn");
+      const tabs = document.getElementById("tabs");
+      const panels = document.getElementById("panels");
+      const historyList = document.getElementById("historyList");
+
+      loadHistory();
+
+      searchBtn.addEventListener("click", () => runSearch(queryInput.value.trim()));
+      queryInput.addEventListener("keydown", (e) => {
+        if (e.key === "Enter") runSearch(queryInput.value.trim());
+      });
+
+      function runSearch(query) {
+        if (!query) return;
+        switchTabs("loading");
+        fetch(`${API_HOST}/search`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ query, models: MODELS }),
+        })
+          .then((r) => r.json())
+          .then((data) => {
+            buildTabs(data);
+            saveHistory(query, data);
+          })
+          .catch((err) => {
+            console.error(err);
+            panels.innerHTML = `<p class="text-red-600">Error: ${err.message}</p>`;
+          });
+      }
+
+      function buildTabs(data) {
+        tabs.innerHTML = "";
+        panels.innerHTML = "";
+        MODELS.forEach((m, i) => {
+          const tab = document.createElement("button");
+          tab.className =
+            "px-4 py-2 whitespace-nowrap" +
+            (i === 0 ? " border-b-2 border-blue-600 text-blue-600" : " text-gray-600");
+          tab.textContent = m;
+          tab.onclick = () => switchTabs(m);
+          tabs.appendChild(tab);
+
+          const panel = document.createElement("div");
+          panel.id = `panel-${m}`;
+          panel.className = i === 0 ? "" : "hidden";
+          panel.innerHTML = `<pre class="whitespace-pre-wrap text-sm">${
+            JSON.stringify(data[m] || "No response", null, 2)
+          }</pre>`;
+          panels.appendChild(panel);
+        });
+      }
+
+      function switchTabs(model) {
+        [...tabs.children].forEach((tab) => {
+          if (tab.textContent === model) {
+            tab.classList.add("border-b-2", "border-blue-600", "text-blue-600");
+          } else {
+            tab.classList.remove("border-b-2", "border-blue-600", "text-blue-600");
+            tab.classList.add("text-gray-600");
+          }
+        });
+        [...panels.children].forEach((p) => {
+          p.classList.toggle("hidden", p.id !== `panel-${model}`);
+        });
+      }
+
+      function saveHistory(query, data) {
+        const record = { query, data, ts: Date.now() };
+        const history = JSON.parse(localStorage.getItem("searchHistory") || "[]");
+        history.unshift(record);
+        localStorage.setItem("searchHistory", JSON.stringify(history.slice(0, 20)));
+        renderHistory();
+      }
+
+      function loadHistory() {
+        renderHistory();
+      }
+
+      function renderHistory() {
+        historyList.innerHTML = "";
+        const history = JSON.parse(localStorage.getItem("searchHistory") || "[]");
+        history.forEach((h) => {
+          const li = document.createElement("li");
+          const date = new Date(h.ts).toLocaleString();
+          li.textContent = `${date} – ${h.query}`;
+          li.onclick = () => buildTabs(h.data);
+          historyList.appendChild(li);
+        });
+      }
+    </script>
+  </body>
+</html>
