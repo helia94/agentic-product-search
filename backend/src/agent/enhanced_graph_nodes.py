@@ -1,5 +1,5 @@
 """
-增强的Graph节点 - 集成智能Firecrawl内容增强功能
+Enhanced Graph nodes - integrated intelligent Firecrawl content enhancement functionality
 """
 
 import os
@@ -19,34 +19,34 @@ from agent.utils import get_research_topic
 
 def content_enhancement_analysis(state: OverallState, config: RunnableConfig) -> dict:
     """
-    智能内容增强分析节点 - 决定是否需要使用Firecrawl进行深度抓取
+    Intelligent content enhancement analysis node - decide whether to use Firecrawl for deep scraping
     
-    这个节点会：
-    1. 分析当前研究结果的质量
-    2. 评估是否需要深度内容增强
-    3. 选择优先的URL进行Firecrawl抓取
-    4. 执行内容增强（如果需要）
-    5. 将增强的内容合并到研究结果中
+    This node will:
+    1. Analyze the quality of current research results
+    2. Evaluate whether deep content enhancement is needed
+    3. Select priority URLs for Firecrawl scraping
+    4. Execute content enhancement (if needed)
+    5. Merge enhanced content into research results
     """
     
     try:
-        # 获取当前研究上下文
+        # Get current research context
         plan = state.get("plan", [])
         current_pointer = state.get("current_task_pointer", 0)
         
-        # 确定研究主题
+        # Determine research topic
         if plan and current_pointer < len(plan):
             research_topic = plan[current_pointer]["description"]
         else:
             research_topic = state.get("user_query") or get_research_topic(state["messages"])
         
-        # 获取当前研究发现
+        # Get current research findings
         current_findings = state.get("web_research_result", [])
         
-        # 获取grounding sources（从最近的搜索结果中提取）
+        # Get grounding sources (extract from recent search results)
         grounding_sources = []
         sources_gathered = state.get("sources_gathered", [])
-        for source in sources_gathered[-10:]:  # 最近的10个源
+        for source in sources_gathered[-10:]:  # Latest 10 sources
             if isinstance(source, dict):
                 grounding_sources.append({
                     "title": source.get("title", ""),
@@ -54,12 +54,12 @@ def content_enhancement_analysis(state: OverallState, config: RunnableConfig) ->
                     "snippet": source.get("snippet", "")
                 })
         
-        print(f"🤔 分析内容增强需求...")
-        print(f"  研究主题: {research_topic}")
-        print(f"  当前发现数量: {len(current_findings)}")
-        print(f"  可用信息源: {len(grounding_sources)}")
+        print(f"🤔 Analyzing content enhancement requirements...")
+        print(f"  Research topic: {research_topic}")
+        print(f"  Current findings count: {len(current_findings)}")
+        print(f"  Available information sources: {len(grounding_sources)}")
         
-        # 使用智能决策器进行分析
+        # Use intelligent decision maker for analysis
         decision = get_content_enhancement_decision_maker().analyze_enhancement_need(
             research_topic=research_topic,
             current_findings=current_findings,
@@ -67,13 +67,13 @@ def content_enhancement_analysis(state: OverallState, config: RunnableConfig) ->
             config=config
         )
         
-        print(f"📊 增强决策结果:")
-        print(f"  需要增强: {decision.needs_enhancement}")
-        print(f"  置信度: {decision.confidence_score:.2f}")
-        print(f"  增强类型: {decision.enhancement_type}")
-        print(f"  优先URL数量: {len(decision.priority_urls)}")
+        print(f"📊 Enhancement decision results:")
+        print(f"  Needs enhancement: {decision.needs_enhancement}")
+        print(f"  Confidence: {decision.confidence_score:.2f}")
+        print(f"  Enhancement type: {decision.enhancement_type}")
+        print(f"  Priority URL count: {len(decision.priority_urls)}")
         
-        # 保存决策到状态
+        # Save decision to state
         state_update = {
             "enhancement_decision": {
                 "needs_enhancement": decision.needs_enhancement,
@@ -84,30 +84,30 @@ def content_enhancement_analysis(state: OverallState, config: RunnableConfig) ->
             }
         }
         
-        # 如果不需要增强，直接返回
+        # If enhancement is not needed, return directly
         if not decision.needs_enhancement:
-            print("✅ 当前内容质量充足，无需增强")
+            print("✅ Current content quality is sufficient, no enhancement needed")
             state_update["enhancement_status"] = "skipped"
             return state_update
         
-        # 如果没有Firecrawl API Key，跳过增强
+        # If no Firecrawl API Key, skip enhancement
         if not get_content_enhancement_decision_maker().firecrawl_app:
-            print("⚠️ 缺少FIRECRAWL_API_KEY，跳过内容增强")
+            print("⚠️ Missing FIRECRAWL_API_KEY, skipping content enhancement")
             state_update["enhancement_status"] = "skipped_no_api"
             return state_update
         
-        # 执行内容增强
-        print(f"🔥 执行Firecrawl内容增强...")
+        # Execute content enhancement
+        print(f"🔥 Executing Firecrawl content enhancement...")
         enhanced_results = []
         
-        # 同步调用（暂时简化，后续可改为异步）
+        # Synchronous call (temporarily simplified, can be changed to async later)
         for url_info in decision.priority_urls:
             url = url_info.get("url")
             if not url:
                 continue
             
             try:
-                print(f"  正在抓取: {url_info.get('title', 'Unknown')}")
+                print(f"  Scraping: {url_info.get('title', 'Unknown')}")
                 
                 result = get_content_enhancement_decision_maker().firecrawl_app.scrape_url(url)
                 
@@ -124,25 +124,25 @@ def content_enhancement_analysis(state: OverallState, config: RunnableConfig) ->
                         "timestamp": datetime.now().isoformat()
                     })
                     
-                    print(f"    ✅ 成功: {len(markdown_content)} 字符")
+                    print(f"    ✅ Success: {len(markdown_content)} characters")
                 else:
-                    print(f"    ❌ 失败: {result.error if hasattr(result, 'error') else '未知错误'}")
+                    print(f"    ❌ Failed: {result.error if hasattr(result, 'error') else 'Unknown error'}")
                     
             except Exception as e:
-                print(f"    ❌ 异常: {str(e)}")
+                print(f"    ❌ Exception: {str(e)}")
                 continue
         
         if enhanced_results:
-            # 将增强内容添加到研究结果中
+            # Add enhanced content to research results
             enhanced_contents = []
             for result in enhanced_results:
-                # 格式化增强内容
+                # Format enhanced content
                 formatted_content = f"""
 
-## 深度内容增强 - {result['title']}
+## Deep Content Enhancement - {result['title']}
 
-来源: {result['url']}
-内容长度: {result['content_length']} 字符
+Source: {result['url']}
+Content length: {result['content_length']} characters
 
 {result['enhanced_content'][:3000]}{'...' if len(result['enhanced_content']) > 3000 else ''}
 

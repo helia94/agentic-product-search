@@ -19,7 +19,7 @@ import { transformEventsToHierarchy, EventData } from "@/utils/dataTransformer";
 type MdComponentProps = {
   className?: string;
   children?: ReactNode;
-  [key: string]: any; // 保留any类型以兼容ReactMarkdown
+  [key: string]: any; // Keep any type for ReactMarkdown compatibility
 };
 
 // Markdown components (from former ReportView.tsx)
@@ -185,9 +185,9 @@ const AiMessageBubble: React.FC<AiMessageBubbleProps> = ({
   copiedMessageId,
   showCompactTimeline,
 }) => {
-  // 🔧 IMPROVED: 改进活动显示逻辑 - 优先显示快照
-  // 1. 如果有历史活动快照，优先显示快照（避免闪现）
-  // 2. 只有最后一条消息且没有快照时，才显示实时活动
+  // 🔧 IMPROVED: Improved activity display logic - prioritize snapshots
+  // 1. If historical activity snapshots exist, prioritize snapshots (avoid flickering)
+  // 2. Only show live activity for the last message when no snapshot exists
   const hasHistoricalActivity = historicalActivity && historicalActivity.length > 0;
   const shouldShowLiveActivity = isLastMessage && isOverallLoading && !hasHistoricalActivity;
   
@@ -196,7 +196,7 @@ const AiMessageBubble: React.FC<AiMessageBubbleProps> = ({
     : (shouldShowLiveActivity ? liveActivity : []);
   const isLiveActivityForThisBubble = shouldShowLiveActivity;
 
-  // 🔧 DEBUG: 简化调试信息
+  // 🔧 DEBUG: Simplified debug information
   if (process.env.NODE_ENV === 'development') {
     console.log(`🎯 AiMessageBubble [${message.id?.slice(-8)}]:`, {
       isLastMessage,
@@ -209,13 +209,13 @@ const AiMessageBubble: React.FC<AiMessageBubbleProps> = ({
 
   return (
     <div className={`relative break-words flex flex-col`}>
-      {/* 🔧 DEBUG: 添加状态显示信息 */}
+      {/* 🔧 DEBUG: Add status display information */}
       {process.env.NODE_ENV === 'development' && (
         <div className="text-xs bg-blue-900 p-1 mb-2 rounded text-white">
           Message: {message.id} | Historical: {historicalActivity?.length || 0} | Live: {liveActivity?.length || 0} | Showing: {activityForThisBubble?.length || 0}
         </div>
       )}
-      {/* 只在没有思考面板时显示活动时间线 */}
+      {/* Only show activity timeline when think panel is hidden */}
       {!showCompactTimeline && activityForThisBubble && activityForThisBubble.length > 0 && (
         <div className="mb-3 border-b border-neutral-700 pb-3 text-xs">
           <ActivityTimeline
@@ -280,19 +280,19 @@ export function ChatMessagesView({
     }
   };
 
-  // 获取转换后的研究数据
+  // Get transformed research data
   const researchData = useMemo(() => {
     try {
-      // 从sessionStorage获取事件数据
+      // Get event data from sessionStorage
       const storedEvents = JSON.parse(sessionStorage.getItem('research_events') || '[]') as EventData[];
       if (storedEvents.length === 0) {
-        console.log("🔍 Think Panel: 没有存储的事件数据");
+        console.log("🔍 Think Panel: No stored event data");
         return null;
       }
       
-      console.log(`🔍 Think Panel: 处理 ${storedEvents.length} 个事件`);
+      console.log(`🔍 Think Panel: Processing ${storedEvents.length} events`);
       const result = transformEventsToHierarchy(storedEvents, messages || []);
-      console.log("🔍 Think Panel: 转换结果", {
+      console.log("🔍 Think Panel: Transformation results", {
         tasksCount: result.tasks.length,
         overallStatus: result.overallStatus,
         currentTaskId: result.currentTaskId,
@@ -306,16 +306,16 @@ export function ChatMessagesView({
       
       return result;
     } catch (error) {
-      console.warn("⚠️ Think Panel: 无法获取研究数据:", error);
+      console.warn("⚠️ Think Panel: Unable to get research data:", error);
       return null;
     }
-  }, [messages, liveActivityEvents, isLoading]); // 添加isLoading依赖确保实时更新
+  }, [messages, liveActivityEvents, isLoading]); // Add isLoading dependency to ensure real-time updates
 
   return (
     <div className="flex h-full">
-      {/* 左侧消息区域 */}
+      {/* Left message area */}
       <div className={`flex flex-col transition-all duration-300 ${showThinkPanel ? 'w-1/2' : 'w-full'}`}>
-        {/* 切换按钮 */}
+        {/* Toggle button */}
         <div className="flex justify-between items-center p-4 border-b border-neutral-800 flex-shrink-0">
           <h3 className="text-lg font-medium text-white">Conversation</h3>
           <Button
@@ -362,7 +362,7 @@ export function ChatMessagesView({
                 </div>
               );
             })}
-            {/* 🔧 FIXED: 改进loading状态显示 - 只在真正需要时显示 */}
+            {/* 🔧 FIXED: Improved loading state display - only show when truly needed */}
             {isLoading && messages.length === 0 && (
               <div className="flex items-start gap-3 mt-3">
                 <div className="relative group max-w-[85%] md:max-w-[80%] rounded-xl p-3 shadow-sm break-words bg-neutral-800 text-neutral-100 rounded-bl-none w-full min-h-[56px]">
@@ -373,7 +373,7 @@ export function ChatMessagesView({
                 </div>
               </div>
             )}
-            {/* 🔧 NEW: 当最后一条是human消息且正在loading时，显示处理状态 */}
+            {/* 🔧 NEW: When last message is human and loading, show processing state */}
             {isLoading && messages.length > 0 && messages[messages.length - 1].type === "human" && (
               <div className="flex items-start gap-3 mt-3">
                 <div className="relative group max-w-[85%] md:max-w-[80%] rounded-xl p-3 shadow-sm break-words bg-neutral-800 text-neutral-100 rounded-bl-none w-full min-h-[56px]">
@@ -413,7 +413,7 @@ export function ChatMessagesView({
         </div>
       </div>
 
-      {/* 右侧思考面板 - 固定高度，独立滚动 */}
+      {/* Right think panel - fixed height, independent scrolling */}
       {showThinkPanel && (
         <div className="w-1/2 border-l border-neutral-800 flex flex-col h-full">
           <ResearchThinkPanel 

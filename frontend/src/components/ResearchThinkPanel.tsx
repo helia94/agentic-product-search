@@ -14,36 +14,36 @@ export const ResearchThinkPanel: React.FC<ResearchThinkPanelProps> = ({
   const [expandedTasks, setExpandedTasks] = React.useState<Set<string>>(new Set());
   const [expandedSteps, setExpandedSteps] = React.useState<Set<string>>(new Set());
 
-  // 当研究数据变化时，自动展开当前任务和所有步骤
+  // When research data changes, automatically expand current task and all steps
   React.useEffect(() => {
     if (researchData) {
-      console.log("🎯 Think Panel: 自动展开逻辑触发", {
+      console.log("🎯 Think Panel: Auto-expand logic triggered", {
         currentTaskId: researchData.currentTaskId,
         overallStatus: researchData.overallStatus,
         tasksCount: researchData.tasks.length
       });
 
-      // 自动展开当前任务和所有有步骤的任务
+      // Auto-expand current task and all tasks with steps
       const tasksWithSteps = researchData.tasks.filter(t => t.steps.length > 0);
-      console.log("🎯 Think Panel: 有步骤的任务:", tasksWithSteps.map(t => ({ id: t.taskId, stepsCount: t.steps.length })));
+      console.log("🎯 Think Panel: Tasks with steps:", tasksWithSteps.map(t => ({ id: t.taskId, stepsCount: t.steps.length })));
       
       if (tasksWithSteps.length > 0) {
         const taskIdsToExpand = tasksWithSteps.map(t => t.taskId);
         setExpandedTasks(new Set(taskIdsToExpand));
         
-        // 自动展开这些任务的所有步骤
+        // Auto-expand all steps of these tasks
         const stepKeysToExpand = tasksWithSteps.flatMap(task => 
           task.steps.map((_, index) => `${task.taskId}-${index}`)
         );
         setExpandedSteps(new Set(stepKeysToExpand));
         
-        console.log("🎯 Think Panel: 自动展开", {
+        console.log("🎯 Think Panel: Auto-expanding", {
           expandedTasks: taskIdsToExpand,
           expandedSteps: stepKeysToExpand.length
         });
       }
       
-      // 如果研究完成，展开所有任务和步骤以显示完整过程
+      // When research is complete, expand all tasks and steps to show complete process
       if (researchData.overallStatus === 'completed') {
         const allTaskIds = researchData.tasks.map(t => t.taskId);
         setExpandedTasks(new Set(allTaskIds));
@@ -53,7 +53,7 @@ export const ResearchThinkPanel: React.FC<ResearchThinkPanelProps> = ({
         );
         setExpandedSteps(new Set(allStepKeys));
         
-        console.log("🎯 Think Panel: 研究完成，展开所有", {
+        console.log("🎯 Think Panel: Research complete, expanding all", {
           allTasks: allTaskIds.length,
           allSteps: allStepKeys.length
         });
@@ -246,7 +246,7 @@ const TaskCard: React.FC<TaskCardProps> = ({
   getStatusIcon,
   getStatusColor
 }) => {
-  console.log(`📋 TaskCard渲染: ${task.taskId}`, {
+  console.log(`📋 TaskCard rendering: ${task.taskId}`, {
     stepsCount: task.steps.length,
     isExpanded,
     steps: task.steps.map(s => ({ type: s.type, title: s.title, hasDetails: !!(s.details && s.details.length > 0) }))

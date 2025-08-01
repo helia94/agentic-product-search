@@ -6,7 +6,7 @@ import { WelcomeScreen } from "@/components/WelcomeScreen";
 import { ChatMessagesView } from "@/components/ChatMessagesView";
 import { transformEventsToHierarchy, debugTransformResult, EventData } from "@/utils/dataTransformer";
 
-// 添加类型定义
+// Add type definitions
 interface StreamEvent {
   [key: string]: unknown;
 }
@@ -43,9 +43,9 @@ export default function App() {
       console.log(state);
     },
     onUpdateEvent: (event: StreamEvent) => {
-      // 🐛 DEBUG: 完整事件日志
-      console.log("📨 收到事件:", event);
-      console.log("📊 事件结构分析:", {
+      // 🐛 DEBUG: Complete event log
+      console.log("📨 Received event:", event);
+      console.log("📊 Event structure analysis:", {
         eventKeys: Object.keys(event),
         eventType: typeof event,
         hasGenerateQuery: !!event.generate_query,
@@ -59,19 +59,19 @@ export default function App() {
         allEventKeys: Object.keys(event).join(", ")
       });
       
-      // 🔧 NEW: 收集事件用于转换器测试 - 现在使用静态收集而不是状态
+      // 🔧 NEW: Collect events for transformer testing - now using static collection instead of state
       const allEvents = JSON.parse(sessionStorage.getItem('research_events') || '[]') as EventData[];
       allEvents.push(event as EventData);
       sessionStorage.setItem('research_events', JSON.stringify(allEvents));
       
-      // 每5个事件测试一次转换器（避免过于频繁）
+      // Test transformer every 5 events (avoid excessive frequency)
       if (allEvents.length % 5 === 0) {
         try {
           const transformedData = transformEventsToHierarchy(allEvents, thread.messages || []);
-          console.log("🔍 数据转换器测试结果:");
+          console.log("🔍 Data transformer test results:");
           debugTransformResult(transformedData);
         } catch (error) {
-          console.warn("⚠️ 数据转换器测试失败:", error);
+          console.warn("⚠️ Data transformer test failed:", error);
         }
       }
       
@@ -85,17 +85,17 @@ export default function App() {
         };
         eventProcessed = true;
       } else if (event.web_research) {
-        // 🐛 DEBUG: 详细记录web_research事件结构
-        console.log("🔍 Web Research 事件详细信息:", event.web_research);
+        // 🐛 DEBUG: Detailed logging of web_research event structure
+        console.log("🔍 Web Research event details:", event.web_research);
         
         const researchData = event.web_research as { sources_gathered?: SourceData[] };
         const sources = researchData.sources_gathered || [];
         const numSources = sources.length;
         
-        // 🐛 DEBUG: 记录来源结构
+        // 🐛 DEBUG: Log source structure
         if (sources.length > 0) {
-          console.log("📊 第一个来源的结构:", sources[0]);
-          console.log("📊 所有来源的keys:", sources.map(s => Object.keys(s)));
+          console.log("📊 First source structure:", sources[0]);
+          console.log("📊 All source keys:", sources.map(s => Object.keys(s)));
         }
         
         const uniqueLabels = [
@@ -110,8 +110,8 @@ export default function App() {
         };
         eventProcessed = true;
       } else if (event.reflection) {
-        // 🐛 DEBUG: 详细记录reflection事件结构
-        console.log("🤔 Reflection 事件详细信息:", event.reflection);
+        // 🐛 DEBUG: Detailed logging of reflection event structure
+        console.log("🤔 Reflection event details:", event.reflection);
         
         const reflectionData = event.reflection as {
           reflection_is_sufficient?: boolean;
@@ -159,8 +159,8 @@ export default function App() {
         };
         eventProcessed = true;
       } else if (event.content_enhancement) {
-        // 🐛 DEBUG: 详细记录content enhancement事件结构
-        console.log("🔧 Content Enhancement 事件详细信息:", event.content_enhancement);
+        // 🐛 DEBUG: Detailed logging of content enhancement event structure
+        console.log("🔧 Content Enhancement event details:", event.content_enhancement);
         
         const enhancementData = event.content_enhancement as {
           enhancement_status?: string;
@@ -203,9 +203,9 @@ export default function App() {
         eventProcessed = true;
       }
       
-      // 🐛 DEBUG: 检查是否有未处理的事件
+      // 🐛 DEBUG: Check for unprocessed events
       if (!eventProcessed) {
-        console.warn("⚠️ 未处理的事件类型:", {
+        console.warn("⚠️ Unprocessed event type:", {
           eventKeys: Object.keys(event),
           eventData: event,
           possibleMissingHandlers: [
@@ -217,22 +217,22 @@ export default function App() {
           ]
         });
       } else {
-        console.log("✅ 事件已处理:", processedEvent?.title);
+        console.log("✅ Event processed:", processedEvent?.title);
         
-        // 🔧 NEW: 在任何关键事件处理后都尝试保存快照
+        // 🔧 NEW: Try to save snapshot after any key event processing
         if (processedEvent?.title === "Reflection" || 
             processedEvent?.title === "Content Enhancement Analysis" ||
             processedEvent?.title === "Research Quality Evaluation") {
-          console.log(`🎯 检测到关键事件，准备保存快照: ${processedEvent.title}`);
+          console.log(`🎯 Detected key event, preparing to save snapshot: ${processedEvent.title}`);
           saveCurrentStateSnapshot(processedEvent.title);
         }
       }
       
       if (processedEvent) {
-        console.log(`➕ 添加新事件到时间线: ${processedEvent.title}`);
+        console.log(`➕ Adding new event to timeline: ${processedEvent.title}`);
         setProcessedEventsTimeline((prevEvents) => {
           const newEvents = [...prevEvents, processedEvent!];
-          console.log(`📋 更新后的事件时间线 (${newEvents.length}):`, newEvents.map(e => e.title));
+          console.log(`📋 Updated event timeline (${newEvents.length}):`, newEvents.map(e => e.title));
           return newEvents;
         });
       }
@@ -273,7 +273,7 @@ export default function App() {
       setProcessedEventsTimeline([]);
       hasFinalizeEventOccurredRef.current = false;
       
-      // 清空事件存储
+      // Clear event storage
       sessionStorage.removeItem('research_events');
 
       // convert effort to, initial_search_query_count and max_research_loops
@@ -320,43 +320,43 @@ export default function App() {
     window.location.reload();
   }, [thread]);
 
-  // 新增：保存中间状态快照的函数
+  // New: Function to save intermediate state snapshots
   const saveCurrentStateSnapshot = useCallback((stateName: string) => {
-    console.log(`📸 保存状态快照: ${stateName}`);
-    console.log(`📊 当前消息数量: ${thread.messages?.length || 0}`);
-    console.log(`📊 当前时间线事件数: ${processedEventsTimeline.length}`);
+    console.log(`📸 Saving state snapshot: ${stateName}`);
+    console.log(`📊 Current message count: ${thread.messages?.length || 0}`);
+    console.log(`📊 Current timeline event count: ${processedEventsTimeline.length}`);
     
-    // 增加延迟时间，确保AI消息已创建
+    // Increase delay time to ensure AI message is created
     setTimeout(() => {
-      console.log(`⏰ 延迟后检查消息: ${thread.messages?.length || 0}`);
+      console.log(`⏰ Check messages after delay: ${thread.messages?.length || 0}`);
       if (thread.messages && thread.messages.length > 0) {
         const lastMessage = thread.messages[thread.messages.length - 1];
-        console.log(`📋 最后一条消息:`, { 
+        console.log(`📋 Last message:`, { 
           id: lastMessage.id, 
           type: lastMessage.type, 
           contentLength: typeof lastMessage.content === 'string' ? lastMessage.content.length : 'non-string'
         });
         
         if (lastMessage && lastMessage.type === "ai" && lastMessage.id) {
-          // 创建当前时间线的快照
+          // Create snapshot of current timeline
           const snapshot = [...processedEventsTimeline];
-          console.log(`📷 为消息 ${lastMessage.id} 保存快照 (${snapshot.length} 事件):`, snapshot.map(e => e.title));
+          console.log(`📷 Saving snapshot for message ${lastMessage.id} (${snapshot.length} events):`, snapshot.map(e => e.title));
           
           setHistoricalActivities((prev) => {
             const newActivities = {
               ...prev,
               [lastMessage.id!]: snapshot,
             };
-            console.log(`✅ 快照已保存，历史活动数:`, Object.keys(newActivities).length);
+            console.log(`✅ Snapshot saved, historical activity count:`, Object.keys(newActivities).length);
             return newActivities;
           });
         } else {
-          console.warn(`⚠️ 无法保存快照 ${stateName}: 最后一条消息不是AI消息`);
+          console.warn(`⚠️ Cannot save snapshot ${stateName}: Last message is not an AI message`);
         }
       } else {
-        console.warn(`⚠️ 无法保存快照 ${stateName}: 没有消息`);
+        console.warn(`⚠️ Cannot save snapshot ${stateName}: No messages`);
       }
-    }, 300); // 增加延迟到300ms
+    }, 300); // Increase delay to 300ms
   }, [thread.messages, processedEventsTimeline]);
 
   return (

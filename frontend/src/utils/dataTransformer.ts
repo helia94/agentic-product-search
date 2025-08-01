@@ -1,8 +1,8 @@
 /**
- * 数据转换器：将平铺的事件流转换为层次化的任务结构
+ * Data transformer: Convert flat event streams into hierarchical task structures
  */
 
-// 添加类型定义
+// Add type definitions
 export interface EventData {
   [key: string]: unknown;
 }
@@ -76,16 +76,16 @@ export interface ProcessedResearchData {
 }
 
 /**
- * 主转换函数：将事件流转换为层次化结构
+ * Main transformation function: Convert event streams to hierarchical structure
  */
 export function transformEventsToHierarchy(
   events: EventData[],
   messages: EventData[]
 ): ProcessedResearchData {
   
-  console.log(`🔄 开始转换 ${events.length} 个事件`);
+  console.log(`🔄 Starting transformation of ${events.length} events`);
   
-  // 统计事件类型
+  // Count event types
   const eventTypes: Record<string, number> = {};
   events.forEach(event => {
     Object.keys(event).forEach(key => {
@@ -93,9 +93,9 @@ export function transformEventsToHierarchy(
     });
   });
   
-  console.log(`📊 事件类型统计:`, eventTypes);
+  console.log(`📊 Event type statistics:`, eventTypes);
   
-  // 初始化结果结构
+  // Initialize result structure
   const result: ProcessedResearchData = {
     planning: null,
     tasks: [],
@@ -103,10 +103,10 @@ export function transformEventsToHierarchy(
     overallStatus: 'planning'
   };
 
-  // 收集所有状态信息
+  // Collect all state information
   let latestState: StateData = {};
   
-  // 从事件中提取最新状态
+  // Extract latest state from events
   events.forEach(event => {
     Object.keys(event).forEach(key => {
       if (event[key] && typeof event[key] === 'object') {
@@ -115,22 +115,22 @@ export function transformEventsToHierarchy(
     });
   });
 
-  // 如果有messages，从最后一条AI消息中提取状态
+  // If there are messages, extract state from the last AI message
   const lastAIMessage = [...messages].reverse().find(msg => 
     typeof msg === 'object' && msg !== null && 'type' in msg && msg.type === 'ai'
   );
   if (lastAIMessage && typeof lastAIMessage === 'object' && 'content' in lastAIMessage) {
-    // 尝试解析可能包含的状态信息
-    // 这里可以根据需要扩展状态提取逻辑
+    // Try to parse possible state information
+    // State extraction logic can be extended here as needed
   }
 
-  // 1. 处理Planning信息
+  // 1. Process Planning information
   result.planning = extractPlanningInfo(events, latestState);
   
-  // 2. 构建任务详情
+  // 2. Build task details
   result.tasks = buildTaskDetails(events, latestState);
   
-  // 3. 确定当前任务和整体状态
+  // 3. Determine current task and overall status
   result.currentTaskId = getCurrentTaskId(events, latestState);
   result.overallStatus = determineOverallStatus(events);
 
@@ -138,10 +138,10 @@ export function transformEventsToHierarchy(
 }
 
 /**
- * 提取Planning信息
+ * Extract Planning information
  */
 function extractPlanningInfo(events: EventData[], state: StateData): PlanningInfo | null {
-  // 查找planning相关事件
+  // Look for planning-related events
   const planningEvent = events.find(event => 
     event.planner || event.planner_node || event.planning
   );
@@ -165,19 +165,19 @@ function extractPlanningInfo(events: EventData[], state: StateData): PlanningInf
 }
 
 /**
- * 构建任务详情
+ * Build task details
  */
 function buildTaskDetails(events: EventData[], state: StateData): TaskDetail[] {
   const plan = state.plan || [];
   const currentPointer = state.current_task_pointer || 0;
 
-  console.log(`🏗️ 构建任务详情: 总任务数 ${plan.length}, 当前指针 ${currentPointer}`);
+  console.log(`🏗️ Building task details: Total tasks ${plan.length}, Current pointer ${currentPointer}`);
 
   return plan.map((task: TaskData, index: number) => {
     const taskId = task.id;
-    console.log(`📋 处理任务 ${index}: ${taskId} - ${task.description}`);
+    console.log(`📋 Processing task ${index}: ${taskId} - ${task.description}`);
     
-    // 确定任务状态
+    // Determine task status
     let taskStatus: 'pending' | 'in_progress' | 'completed' = 'pending';
     if (index < currentPointer) {
       taskStatus = 'completed';
@@ -185,11 +185,11 @@ function buildTaskDetails(events: EventData[], state: StateData): TaskDetail[] {
       taskStatus = 'in_progress';
     }
 
-    // 构建任务步骤 - 对所有任务构建步骤，不只是当前任务
+    // Build task steps - build steps for all tasks, not just current task
     const shouldShowSteps = index <= currentPointer;
-    console.log(`📋 任务 ${index} 状态: ${taskStatus}, 是否显示步骤: ${shouldShowSteps}`);
+    console.log(`📋 Task ${index} status: ${taskStatus}, Should show steps: ${shouldShowSteps}`);
     const steps = buildTaskSteps(events, state, taskId, shouldShowSteps);
-    console.log(`📋 任务 ${index} 构建了 ${steps.length} 个步骤`);
+    console.log(`📋 Task ${index} built ${steps.length} steps`);
 
     return {
       taskId,
@@ -201,20 +201,20 @@ function buildTaskDetails(events: EventData[], state: StateData): TaskDetail[] {
 }
 
 /**
- * 构建任务步骤 - 改进版本，支持显示所有任务的历史步骤
+ * Build task steps - improved version, supports showing historical steps for all tasks
  */
 function buildTaskSteps(
   events: EventData[], 
   state: StateData, 
   taskId: string, 
-  shouldShowSteps: boolean // 当前任务或已完成任务都显示步骤
+  shouldShowSteps: boolean // Show steps for current task or completed tasks
 ): TaskStep[] {
   const steps: TaskStep[] = [];
 
-  console.log(`🔧 构建任务步骤 for ${taskId}, shouldShowSteps: ${shouldShowSteps}`);
-  console.log(`📊 事件总数: ${events.length}`);
+  console.log(`🔧 Building task steps for ${taskId}, shouldShowSteps: ${shouldShowSteps}`);
+  console.log(`📊 Total events: ${events.length}`);
 
-  // 如果是当前任务或已完成任务，根据事件构建步骤
+  // If current task or completed task, build steps based on events
   if (shouldShowSteps) {
     // 1. Query Generation
     const queryEvents = events.filter(event => event.generate_query);

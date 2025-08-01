@@ -1,5 +1,5 @@
 """
-智能内容增强决策模块 - 决定何时使用Firecrawl进行深度内容抓取
+Intelligent content enhancement decision module - decide when to use Firecrawl for deep content scraping
 """
 
 import os
@@ -11,7 +11,7 @@ from firecrawl import FirecrawlApp
 
 @dataclass
 class EnhancementDecision:
-    """内容增强决策结果"""
+    """Content enhancement decision result"""
     needs_enhancement: bool
     priority_urls: List[Dict[str, Any]]
     reasoning: str
@@ -20,7 +20,7 @@ class EnhancementDecision:
 
 
 class ContentEnhancementDecisionMaker:
-    """智能内容增强决策器 - 类似reflection机制"""
+    """Intelligent content enhancement decision maker - similar to reflection mechanism"""
     
     def __init__(self):
         self.firecrawl_app = None
@@ -35,17 +35,17 @@ class ContentEnhancementDecisionMaker:
         config: RunnableConfig
     ) -> EnhancementDecision:
         """
-        智能分析是否需要内容增强 - 使用LLM做判断
+        Intelligently analyze whether content enhancement is needed - use LLM for judgment
         
-        类似reflection机制，让LLM分析当前研究质量并决定是否需要深度抓取
+        Similar to reflection mechanism, let LLM analyze current research quality and decide whether deep scraping is needed
         """
         
-        # 构建分析提示词
+        # Build analysis prompt
         analysis_prompt = self._build_analysis_prompt(
             research_topic, current_findings, grounding_sources
         )
         
-        # 使用LLM进行智能判断
+        # Use LLM for intelligent judgment
         from agent.configuration import Configuration
         configurable = Configuration.from_runnable_config(config)
         
@@ -59,7 +59,7 @@ class ContentEnhancementDecisionMaker:
         response = llm.invoke(analysis_prompt)
         decision_text = response.content if hasattr(response, 'content') else str(response)
         
-        # 解析LLM的决策
+        # Parse LLM's decision
         return self._parse_llm_decision(decision_text, grounding_sources)
     
     def _build_analysis_prompt(
@@ -68,57 +68,57 @@ class ContentEnhancementDecisionMaker:
         current_findings: List[str], 
         grounding_sources: List[Dict[str, Any]]
     ) -> str:
-        """构建分析提示词"""
+        """Build analysis prompt"""
         
-        findings_summary = "\n---\n".join(current_findings[-3:])  # 最近3个结果
+        findings_summary = "\n---\n".join(current_findings[-3:])  # Latest 3 results
         
         sources_list = "\n".join([
             f"- {source.get('title', 'N/A')}: {source.get('url', 'N/A')}"
-            for source in grounding_sources[:5]  # 前5个源
+            for source in grounding_sources[:5]  # First 5 sources
         ])
         
-        return f"""你是一个研究质量评估专家。请分析当前的研究结果质量，并决定是否需要深度内容增强。
+        return f"""You are a research quality assessment expert. Please analyze the quality of current research results and decide whether deep content enhancement is needed.
 
-研究主题: {research_topic}
+Research topic: {research_topic}
 
-当前研究发现:
+Current research findings:
 {findings_summary}
 
-可用的信息源:
+Available information sources:
 {sources_list}
 
-请根据以下标准进行评估:
+Please evaluate based on the following criteria:
 
-1. **内容深度不足的信号**:
-   - 缺乏具体数据、统计信息、案例研究
-   - 描述过于泛泛，缺乏技术细节
-   - 没有提及重要的公司、项目或实施案例
-   - 信息源质量不高（非权威网站）
+1. **Signals of insufficient content depth**:
+   - Lack of specific data, statistical information, case studies
+   - Descriptions too general, lacking technical details
+   - No mention of important companies, projects, or implementation cases
+   - Low quality information sources (non-authoritative websites)
 
-2. **需要深度抓取的情况**:
-   - 研究主题需要详细的技术说明
-   - 当前结果缺乏关键数据支撑
-   - 存在权威信息源但内容被截断
-   - 需要获取完整的报告或研究内容
+2. **Situations requiring deep scraping**:
+   - Research topic requires detailed technical explanations
+   - Current results lack key data support
+   - Authoritative information sources exist but content is truncated
+   - Need to obtain complete reports or research content
 
-3. **评估当前信息源的价值**:
-   - 官方网站/文档: 高价值
-   - 学术论文/研究报告: 高价值  
-   - 维基百科/百科类: 中等价值
-   - 新闻报道: 根据详细程度判断
-   - 博客/论坛: 低价值
+3. **Evaluate the value of current information sources**:
+   - Official websites/documents: High value
+   - Academic papers/research reports: High value  
+   - Wikipedia/encyclopedia: Medium value
+   - News reports: Judge based on level of detail
+   - Blogs/forums: Low value
 
-请按以下格式回答:
+Please answer in the following format:
 
-**决策**: [ENHANCE/NO_ENHANCE]
-**置信度**: [0.1-1.0]
-**增强类型**: [selective/comprehensive/none]
-**推荐URL数量**: [0-3]
-**推理过程**: 
-[详细说明你的判断理由，包括当前内容的不足之处和预期的改进效果]
+**Decision**: [ENHANCE/NO_ENHANCE]
+**Confidence**: [0.1-1.0]
+**Enhancement type**: [selective/comprehensive/none]
+**Recommended URL count**: [0-3]
+**Reasoning process**: 
+[Detailed explanation of your judgment reasons, including current content shortcomings and expected improvement effects]
 
-**优先URLs** (如果需要增强):
-[从信息源中选择最值得深度抓取的URL，按优先级排序]
+**Priority URLs** (if enhancement needed):
+[Select URLs from information sources that are most worthy of deep scraping, ranked by priority]
 """
 
     def _parse_llm_decision(
@@ -126,42 +126,42 @@ class ContentEnhancementDecisionMaker:
         decision_text: str, 
         grounding_sources: List[Dict[str, Any]]
     ) -> EnhancementDecision:
-        """解析LLM的决策结果"""
+        """Parse LLM decision results"""
         
         decision_text = decision_text.lower()
         
-        # 解析基本决策
+        # Parse basic decision
         needs_enhancement = "enhance" in decision_text and "no_enhance" not in decision_text
         
-        # 解析置信度
-        confidence_score = 0.5  # 默认值
+        # Parse confidence
+        confidence_score = 0.5  # Default value
         import re
-        confidence_match = re.search(r'置信度.*?([0-9]\.[0-9])', decision_text)
+        confidence_match = re.search(r'confidence.*?([0-9]\.[0-9])', decision_text)
         if confidence_match:
             try:
                 confidence_score = float(confidence_match.group(1))
             except:
                 pass
         
-        # 解析增强类型
+        # Parse enhancement type
         enhancement_type = "none"
         if "selective" in decision_text:
             enhancement_type = "selective"
         elif "comprehensive" in decision_text:
             enhancement_type = "comprehensive"
         elif needs_enhancement:
-            enhancement_type = "selective"  # 默认选择性增强
+            enhancement_type = "selective"  # Default selective enhancement
         
-        # 选择优先URL（简化版本，可以后续改进为LLM选择）
+        # Select priority URLs (simplified version, can be improved to LLM selection later)
         priority_urls = []
         if needs_enhancement and grounding_sources:
-            # 简单的优先级算法
+            # Simple priority algorithm
             scored_sources = []
             for source in grounding_sources:
                 score = self._calculate_url_priority(source)
                 scored_sources.append((source, score))
             
-            # 按评分排序，选择前2-3个
+            # Sort by score, select top 2-3
             scored_sources.sort(key=lambda x: x[1], reverse=True)
             max_urls = 3 if enhancement_type == "comprehensive" else 2
             
@@ -170,10 +170,10 @@ class ContentEnhancementDecisionMaker:
                     "title": source.get("title", ""),
                     "url": source.get("url", ""),
                     "priority_score": score,
-                    "reasoning": f"评分: {score:.2f}"
+                    "reasoning": f"Score: {score:.2f}"
                 }
                 for source, score in scored_sources[:max_urls]
-                if score > 0.3  # 只选择评分较高的
+                if score > 0.3  # Only select high-scoring ones
             ]
         
         return EnhancementDecision(
@@ -185,29 +185,29 @@ class ContentEnhancementDecisionMaker:
         )
     
     def _calculate_url_priority(self, source: Dict[str, Any]) -> float:
-        """计算URL的优先级评分"""
+        """Calculate priority score for URL"""
         score = 0.0
         
         url = source.get("url", "").lower()
         title = source.get("title", "").lower()
         
-        # 官方网站和文档
+        # Official websites and documents
         if any(domain in url for domain in [".gov", ".edu", ".org"]):
             score += 0.4
         
-        # 知名平台
+        # Well-known platforms
         if any(platform in url for platform in ["wikipedia", "arxiv", "ieee", "acm"]):
             score += 0.3
         
-        # 技术内容指标
+        # Technical content indicators
         if any(keyword in title for keyword in ["report", "study", "research", "analysis", "technical"]):
             score += 0.2
         
-        # 公司官网
+        # Company official websites
         if any(company in url for company in ["google", "microsoft", "amazon", "tesla", "nvidia"]):
             score += 0.2
         
-        # 基础评分
+        # Base score
         score += 0.1
         
         return min(score, 1.0)
@@ -216,7 +216,7 @@ class ContentEnhancementDecisionMaker:
         self, 
         priority_urls: List[Dict[str, Any]]
     ) -> List[Dict[str, Any]]:
-        """使用Firecrawl增强内容"""
+        """Use Firecrawl to enhance content"""
         
         if not self.firecrawl_app:
             return []
@@ -229,7 +229,7 @@ class ContentEnhancementDecisionMaker:
                 continue
             
             try:
-                print(f"🔥 Firecrawl增强: {url_info.get('title', 'Unknown')}")
+                print(f"🔥 Firecrawl enhancement: {url_info.get('title', 'Unknown')}")
                 
                 result = self.firecrawl_app.scrape_url(url)
                 
@@ -246,18 +246,18 @@ class ContentEnhancementDecisionMaker:
                         "source_type": "firecrawl_enhanced"
                     })
                     
-                    print(f"  ✅ 增强成功: {len(markdown_content)} 字符")
+                    print(f"  ✅ Enhancement successful: {len(markdown_content)} characters")
                 else:
-                    print(f"  ❌ 增强失败: {result.error if hasattr(result, 'error') else '未知错误'}")
+                    print(f"  ❌ Enhancement failed: {result.error if hasattr(result, 'error') else 'Unknown error'}")
                     
             except Exception as e:
-                print(f"  ❌ 增强异常: {str(e)}")
+                print(f"  ❌ Enhancement exception: {str(e)}")
                 continue
         
         return enhanced_results
     
     def _assess_enhancement_quality(self, content: str) -> str:
-        """评估增强内容的质量"""
+        """Assess the quality of enhanced content"""
         if not content:
             return "poor"
         
@@ -275,12 +275,12 @@ class ContentEnhancementDecisionMaker:
             return "poor"
 
 
-# 延迟初始化函数，避免循环导入
+# Delayed initialization function to avoid circular imports
 def get_content_enhancement_decision_maker():
-    """获取内容增强决策器实例（延迟初始化）"""
+    """Get content enhancement decision maker instance (delayed initialization)"""
     if not hasattr(get_content_enhancement_decision_maker, '_instance'):
         get_content_enhancement_decision_maker._instance = ContentEnhancementDecisionMaker()
     return get_content_enhancement_decision_maker._instance
 
-# 为了向后兼容，保留原有的全局变量名
-content_enhancement_decision_maker = None  # 将在首次使用时初始化 
+# For backward compatibility, keep original global variable name
+content_enhancement_decision_maker = None  # Will be initialized on first use 

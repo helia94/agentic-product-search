@@ -11,7 +11,7 @@ from langgraph.graph import StateGraph
 from langgraph.graph import START, END
 from langchain_core.runnables import RunnableConfig
 from google.genai import Client
-import tiktoken  # 需确保环境已安装 tiktoken
+import tiktoken  # Ensure tiktoken is installed in the environment
 
 from agent.state import (
     OverallState,
@@ -330,35 +330,35 @@ Important: Respond only with valid JSON."""
             try:
                 fallback_response = llm.invoke(simple_prompt)
                 import json
-                # 尝试解析JSON响应
+                # Try to parse JSON response
                 response_text = fallback_response.content if hasattr(fallback_response, 'content') else str(fallback_response)
-                # 提取JSON部分
+                # Extract JSON part
                 import re
                 json_match = re.search(r'\{.*\}', response_text, re.DOTALL)
                 if json_match:
                     result_dict = json.loads(json_match.group())
-                    # 创建Reflection对象
+                    # Create Reflection object
                     result = Reflection(
                         is_sufficient=result_dict.get("is_sufficient", True),
                         knowledge_gap=result_dict.get("knowledge_gap", "Analysis completed with available data"),
                         follow_up_queries=result_dict.get("follow_up_queries", [])
                     )
-                    print("✅ Fallback方案成功")
+                    print("✅ Fallback approach successful")
                 else:
-                    raise ValueError("无法解析JSON响应")
+                    raise ValueError("Unable to parse JSON response")
                     
             except Exception as fallback_error:
-                print(f"❌ Fallback方案也失败: {str(fallback_error)}")
-                print("🛡️ 使用默认reflection结果")
+                print(f"❌ Fallback approach also failed: {str(fallback_error)}")
+                print("🛡️ Using default reflection result")
                 
-                # 最终fallback: 基于结果数量的简单判断
+                # Final fallback: simple judgment based on result count
                 has_sufficient_results = len(web_research_results) >= 3
                 result = Reflection(
                     is_sufficient=has_sufficient_results,
                     knowledge_gap="Analysis completed with available research data" if has_sufficient_results else "Limited research data available",
                     follow_up_queries=[] if has_sufficient_results else [f"additional information about {research_topic}"]
                 )
-                print(f"🛡️ 默认判断: sufficient={has_sufficient_results}, 基于{len(web_research_results)}个搜索结果")
+                print(f"🛡️ Default judgment: sufficient={has_sufficient_results}, based on {len(web_research_results)} search results")
 
     except Exception as e:
         error_message = f"Reflection node encountered critical error: {str(e)}"
@@ -375,9 +375,9 @@ Important: Respond only with valid JSON."""
     # Return updated state with reflection results
     return {
         "research_loop_count": state["research_loop_count"],
-        "reflection_is_sufficient": result.is_sufficient,  # 新增字段保存reflection结果
-        "reflection_knowledge_gap": result.knowledge_gap,  # 新增字段保存知识差距
-        "reflection_follow_up_queries": result.follow_up_queries,  # 新增字段保存follow-up查询
+        "reflection_is_sufficient": result.is_sufficient,  # New field to save reflection result
+        "reflection_knowledge_gap": result.knowledge_gap,  # New field to save knowledge gap
+        "reflection_follow_up_queries": result.follow_up_queries,  # New field to save follow-up queries
         "number_of_ran_queries": len(state.get("executed_search_queries", [])),
         "plan": state.get("plan", []),
         "current_task_pointer": state.get("current_task_pointer", 0)
@@ -386,50 +386,50 @@ Important: Respond only with valid JSON."""
 
 def evaluate_research_enhanced(state: OverallState, config: RunnableConfig) -> dict:
     """
-    增强版研究评估节点 - 更新状态中的评估结果
+    Enhanced research evaluation node - update evaluation results in state
     
-    这个函数只负责状态更新，不负责路由决策
+    This function is only responsible for state updates, not routing decisions
     """
     configurable = Configuration.from_runnable_config(config)
     
-    # 获取reflection结果
+    # Get reflection results
     research_loop_count = state.get("research_loop_count", 0)
     max_research_loops = configurable.max_research_loops
     reflection_is_sufficient = state.get("reflection_is_sufficient", False)
     reflection_follow_up_queries = state.get("reflection_follow_up_queries", [])
     
-    # 检查是否已经完成增强以及增强的效果
+    # Check if enhancement has been completed and its effectiveness
     enhancement_status = state.get("enhancement_status")
     enhanced_sources_count = state.get("enhanced_sources_count", 0)
     
-    # 智能决策：考虑reflection结果和增强效果
+    # Smart decision: consider reflection results and enhancement effects
     is_sufficient = reflection_is_sufficient
     
-    # 如果reflection认为不充足，但我们成功进行了内容增强，可能需要重新评估
+    # If reflection considers insufficient, but we successfully enhanced content, may need re-evaluation
     if not is_sufficient and enhancement_status == "completed" and enhanced_sources_count > 0:
-        print(f"📈 内容增强完成 ({enhanced_sources_count} 个源)，提升充足性评估")
-        # 给增强内容一定的"加分"
+        print(f"📈 Content enhancement completed ({enhanced_sources_count} sources), improving sufficiency assessment")
+        # Give enhanced content some "bonus points"
         enhancement_boost = min(enhanced_sources_count * 0.3, 0.8)
         if enhancement_boost >= 0.6:
-            print(f"  ✅ 基于内容增强结果，判定信息已充足")
+            print(f"  ✅ Based on content enhancement results, determined information is sufficient")
             is_sufficient = True
     
-    # 准备follow-up查询（如果需要继续研究）
+    # Prepare follow-up queries (if further research is needed)
     follow_up_queries = reflection_follow_up_queries or []
     if not follow_up_queries and not is_sufficient:
-        # 如果没有follow-up查询但信息不充足，生成简单的查询
+        # If no follow-up queries but information is insufficient, generate simple queries
         plan = state.get("plan", [])
         current_pointer = state.get("current_task_pointer", 0)
         if plan and current_pointer < len(plan):
             task_description = plan[current_pointer]["description"]
             follow_up_queries = [f"more details about {task_description}"]
     
-    # 记录评估结果到状态
+    # Record evaluation results to state
     final_decision = is_sufficient or research_loop_count >= max_research_loops
     
-    print(f"🏁 研究评估完成 - 充足性: {is_sufficient}, 循环次数: {research_loop_count}/{max_research_loops}")
+    print(f"🏁 Research evaluation completed - Sufficiency: {is_sufficient}, Loop count: {research_loop_count}/{max_research_loops}")
     if enhancement_status == "completed":
-        print(f"  🔥 本轮包含Firecrawl内容增强: {enhanced_sources_count} 个源")
+        print(f"  🔥 This round includes Firecrawl content enhancement: {enhanced_sources_count} sources")
     
     return {
         "evaluation_is_sufficient": is_sufficient,
@@ -442,23 +442,23 @@ def evaluate_research_enhanced(state: OverallState, config: RunnableConfig) -> d
 
 def decide_next_research_step(state: OverallState):
     """
-    条件边函数 - 决定研究是否完成还是继续
-    可以返回字符串路由或Send对象列表
+    Conditional edge function - decide whether research is complete or continues
+    Can return string route or list of Send objects
     """
-    # 从状态中获取评估结果
+    # Get evaluation results from state
     should_continue = state.get("evaluation_should_continue", False)
     research_complete = state.get("evaluation_research_complete", False)
     
     if research_complete or not should_continue:
-        print("🏁 研究流程完成，记录任务结果")
+        print("🏁 Research process completed, recording task results")
         return "record_task_completion"
     else:
-        print("🔄 继续研究，执行follow-up查询")
-        # 生成follow-up查询的Send对象
+        print("🔄 Continue research, execute follow-up queries")
+        # Generate Send objects for follow-up queries
         follow_up_queries = state.get("evaluation_follow_up_queries", [])
         
         if not follow_up_queries:
-            print("⚠️ 没有follow-up查询，直接完成")
+            print("⚠️ No follow-up queries, completing directly")
             return "record_task_completion"
         
         # Get current task info for follow-up research
@@ -469,9 +469,9 @@ def decide_next_research_step(state: OverallState):
         if plan and current_pointer < len(plan):
             current_task_id = plan[current_pointer]["id"]
         
-        print(f"🔄 生成 {len(follow_up_queries)} 个follow-up查询")
+        print(f"🔄 Generated {len(follow_up_queries)} follow-up queries")
         
-        # 返回follow-up查询的Send列表
+        # Return list of Send objects for follow-up queries
         from langgraph.types import Send
         return [
             Send(
@@ -601,7 +601,7 @@ TIMESTAMP: {result.get('timestamp', '')}{sources_info}
                         'snippet': source.get('snippet', '')
                     })
             
-            print(f"🎯 启动报告级别增强分析...")
+            print(f"🎯 Starting report-level enhancement analysis...")
             enhanced_research_data, enhancement_results = integrate_report_enhancement_into_finalize(
                 user_query=user_query,
                 research_plan=plan,
@@ -616,14 +616,14 @@ TIMESTAMP: {result.get('timestamp', '')}{sources_info}
             # Log enhancement results
             successful_enhancements = [r for r in enhancement_results if r.success]
             if successful_enhancements:
-                print(f"✅ 报告级别增强成功: {len(successful_enhancements)} 个增强点")
+                print(f"✅ Report-level enhancement successful: {len(successful_enhancements)} enhancement points")
                 for result in successful_enhancements:
-                    print(f"   - 质量: {result.enhancement_quality}, 源数量: {len(result.sources_used)}")
+                    print(f"   - Quality: {result.enhancement_quality}, Source count: {len(result.sources_used)}")
             else:
-                print("ℹ️  报告级别增强: 未执行或无有效增强")
+                print("ℹ️  Report-level enhancement: Not executed or no effective enhancement")
                 
         except Exception as e:
-            print(f"⚠️ 报告级别增强异常，继续使用原始数据: {str(e)}")
+            print(f"⚠️ Report-level enhancement exception, continuing with original data: {str(e)}")
             # Continue with original data if enhancement fails
         
         # Generate integrated report using the enhanced holistic approach
@@ -661,7 +661,7 @@ TIMESTAMP: {result.get('timestamp', '')}{sources_info}
         }
 
 def build_source_mapping(sources_gathered):
-    """构建源文件映射，用于引用转换"""
+    """Build source file mapping for citation conversion"""
     mapping = {}
     for i, source in enumerate(sources_gathered):
         # Extract domain from URL for readable citation
@@ -696,7 +696,7 @@ def build_source_mapping(sources_gathered):
     return mapping
 
 def extract_domain(url):
-    """从URL中提取域名"""
+    """Extract domain from URL"""
     import re
     if not url:
         return "Unknown"
