@@ -23,7 +23,11 @@ dependencies = [
     "httpx",
     "python-dotenv",
     "uvicorn",
-    "beautifulsoup4"
+    "beautifulsoup4",
+    "langchain-groq",
+    "langchain-tavily",
+    "langchain-community",
+    "praw"
 ]
 
 
