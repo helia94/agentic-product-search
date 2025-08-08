@@ -1,15 +1,14 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import TypedDict, List, Optional, Dict, Any
+from typing import List, Optional, Dict, Any
 
 from langgraph.graph import add_messages
-from typing_extensions import Annotated
+from typing_extensions import Annotated, TypedDict
 
 
 import operator
 from dataclasses import dataclass, field
-from typing_extensions import Annotated
 from pydantic import BaseModel, Field
 
 
@@ -103,8 +102,10 @@ class OverallState(TypedDict):
     query_tips: QueryTips
     criteria: List[str]
     queries: List[str]
-    explored_products_messages: Annotated[list, add_messages]
     explored_products: List[ProductSimple]
+    researched_products: List[str]
     selected_products: List[ProductFull]
     selected_criteria: Criteria
     html_report: str
+    max_explore_products: int
+    max_research_products: int

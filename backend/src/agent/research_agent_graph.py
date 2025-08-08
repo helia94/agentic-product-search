@@ -28,21 +28,18 @@ from agent.basic_tools import llm_gemini, llm_with_tools, route_tools_by_message
 #set_debug(True)
 #set_verbose(True)
 
-load_dotenv()
-
 
 
 class State(TypedDict):
     query: str
     criteria: List[str]
-    products: List[ProductSimple]
+    product: ProductSimple
     messages_research: Annotated[list, add_messages]
 
 
  
 def chatbot_research(state: State):
-    products_list = state.get("products", [])
-    products = " ,".join([f"{product['id']}: {product['name']}" for product in products_list])
+    product = state.get("product", "")
     criteria = " ,".join(state.get("criteria", []))
 
 
@@ -56,30 +53,31 @@ def chatbot_research(state: State):
             if the model of product is not clear do not do anything, just return empty list, do not write things depend, maybe you are the info source, do not send the user to do work, you do all the work.
             when you have all the info return the list of criteria for each product in the following format.:
 
-                {{
-                    "fitbit-charge-6": {{
+            example one
+                    {{
                         "price": "$160",
                         "accuracy_of_total_sleep_time": "Good (within 17-20min vs PSG, clinically acceptable <30min bias)",
                         "accuracy_of_deep_sleep_stage": "Poor (70.5% accuracy, tends to overestimate at low amounts)",
                         "ios_app_insights_and_interpretability": "Premium required for sleep score breakdown, sleep profile analysis, restoration details"
-                    }},
-                    "fitbit-inspire-3": {{
+                    }}
+
+            example two
+                     {{
                         "price": "$99", 
                         "accuracy_of_total_sleep_time": "Good (within clinical acceptable range vs PSG)",
                         "accuracy_of_deep_sleep_stage": "Poor (tends to overestimate, inconsistent vs medical grade)",
                         "ios_app_insights_and_interpretability": "Premium required for sleep score breakdown, sleep profile analysis, restoration details"
                     }}
-                }}
 
 
-            here are the products you should research:
-            {products1}
+            here are the product you should research:
+            {product}
             here are the criteria you should evaluate for each product:
             {criteria}
 
         """
     system_prompt = instructions.format(
-        products1=products,
+        product=product,
         criteria=criteria,
     )
 
@@ -92,11 +90,10 @@ def route_tools(state: State):
 
 
 
-
-
 def print_node(state: State):
     print("Current state:")
-    print(state.get("messages_research", [])[-1].content)
+    result = state.get("messages_research", [])[-1].content
+    print(result)
     return state
 
 graph_builder = StateGraph(State)
@@ -120,15 +117,44 @@ graph_builder.add_edge("print_node", END)
 
 
 
-graph = graph_builder.compile()
+research_graph = graph_builder.compile()
+
+
+from langchain_core.tools import tool
+from typing import Annotated, List
+
+
+
+@tool
+def product_research_tool(
+
+    product: Annotated[ProductSimple, "Product to research"],
+    criteria: Annotated[List[str], "Criteria to evaluate for the product"]
+    ):
+    """
+    Research a product based on criteria using the research agent graph.
+
+    Args:
+    product (ProductSimple): The product to research.
+    criteria (List[str]): The criteria to evaluate for the product.
+    Returns:
+    str: The research results as a string.
+    """ 
+
+    final_state = research_graph.invoke (
+        {
+            "product": product,
+            "criteria": criteria
+        }
+    )
+    return final_state.get("messages_research", [])[-1].content
 
 
 if __name__ == "__main__":
 
     def stream_graph_updates():
-        for event in graph.stream(
+        for event in research_graph.stream(
             {
-            "query": "useful sleep tracker", 
             "criteria": [
                 "price",
                 "accuracy of total sleep time",
@@ -136,26 +162,19 @@ if __name__ == "__main__":
                 "IOS app insights and interpretability"
             ],
 
-            "products": [
+            "product": 
                 {
                     "id": "fitbit-charge-6",
                     "name": "Fitbit Charge 6",
                     "USP": "GPS, Google, ECG",
                     "use_case": "Serious fitness tracking",
                     "other_info": "40+ modes, 7-day battery, $160"
-                },
-                {
-                    "id": "fitbit-inspire-3",
-                    "name": "Fitbit Inspire 3",
-                    "USP": "Long battery, cheap",
-                    "use_case": "Basic daily tracking",
-                    "other_info": "20+ modes, SpO2, $99"
                 }
-                ]
+                
             }
-        ):
-            print("Event", event.keys())
+            ):
+            product_research = print("Event", event.keys())
+            return product_research
             
-
 
     stream_graph_updates()

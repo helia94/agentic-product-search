@@ -5,6 +5,8 @@ from datetime import datetime
 
 
 from dotenv import load_dotenv
+
+from agent.basic_tools import route_tools_by_messages
 load_dotenv()
 from langchain_core.messages import AIMessage
 from langgraph.types import Send
@@ -40,38 +42,13 @@ import json
 
 from langchain_core.messages import ToolMessage
 from langchain.globals import set_debug, set_verbose
+from agent.basic_tools import llm_gemini, llm_with_tools, route_tools_by_messages, BasicToolNode, tavily
+from agent.research_agent_graph import product_research_tool
 
 #set_debug(True)
 #set_verbose(True)
 
-load_dotenv()
 
-llm_gemini = ChatGoogleGenerativeAI(
-    model="gemini-2.5-flash",
-    temperature=0,
-    max_tokens=None,
-    timeout=None,
-    max_retries=2,
-)
-
-
-tavily = TavilySearch(
-    max_results=1, #10
-    topic="general",
-    #include_answer="advanced",
-    #include_raw_content=True,
-    # include_images=False,
-    # include_image_descriptions=False,
-    # search_depth="basic",
-    # time_range="day",
-    #include_domains=["reddit.com/"],
-    #exclude_domains=["*/blog/*"],
-)
-
-tools = [tavily]
-
-# Modification: tell the LLM which tools it can call
-llm_with_tools = llm_gemini.bind_tools(tools)
 
 class State(TypedDict):
     query: str
@@ -79,7 +56,7 @@ class State(TypedDict):
     criteria: List[str]
     messages_explore: Annotated[list, add_messages]
     products: List[ProductSimple]
-    messages_research: Annotated[list, add_messages]
+    research_results: List[str]
     max_explore_products: int
     max_research_products: int
 
@@ -97,20 +74,20 @@ def chatbot_explore(state: State):
         here is an example of the product list you should return:
 
         [
-            {
+            {{
                 "id": "fitbit-charge-6",
                 "name": "Fitbit Charge 6",
                 "USP": "GPS, Google, ECG",
                 "use_case": "Serious fitness tracking",
                 "other_info": "40+ modes, 7-day battery, $160"
-            },
-            {
+            }},
+            {{
                 "id": "fitbit-inspire-3",
                 "name": "Fitbit Inspire 3",
                 "USP": "Long battery, cheap",
                 "use_case": "Basic daily tracking",
                 "other_info": "20+ modes, SpO2, $99"
-            }
+            }}
         ]
 
 
@@ -127,113 +104,22 @@ def chatbot_explore(state: State):
     return {"messages_explore": [llm_with_tools.invoke([system_prompt] + state["messages_explore"])]}
 
  
-def chatbot_research(state: State):
-    products_list = state.get("products", [])
-    products = " ,".join([f"{product['id']}: {product['name']}" for product in products_list])
-    criteria = " ,".join(state.get("criteria", []))
 
 
-    instructions = """
-            for every product find all relevant criteria and check all conditions by using your search tool. 
-            Start with easy objective criteria that is obvious by seller webpage and then move on to search user reviews and deep dives for subjective and hard to define criteria. 
-            use your search tool but no more than 5 searches per product, best to get it all with only one shot. 
-            i am counting on your unfiltered expert opinion, do not just take what the seller claims, but what the users say and what you can find in the reviews.
-            be super direct, no fluff, no generic statements, all words should count, limited space in the ui to show the results, imagine the shortest message to deliver to a best friend.
-            criteria should be relative if a is better than b in some aspect, make sure it shows in the wordings, if you do not know the criteria value, use "unknown" as a placeholder.
-            if the model of product is not clear do not do anything, just return empty list, do not write things depend, maybe you are the info source, do not send the user to do work, you do all the work.
-            when you have all the info return the list of criteria for each product in the following format.:
-
-            {{
-                "product_id_1": {{
-                    "criteria_id_1" : "value of criteria",
-                    "criteria_id_2" : "unknown"
-                }},
-                "product_id_2": {{
-                    "criteria_id_1" : "value of criteria 1",
-                    "criteria_id_2" : "value of criteria 2"
-                }}
-            }}
-
-            here are the products you should research:
-            {products1}
-            here are the criteria you should evaluate for each product:
-            {criteria}
-
-        """
-    system_prompt = instructions.format(
-        products1=products,
-        criteria=criteria,
-    )
-
-    return {"messages_research": [llm_with_tools.invoke([system_prompt] + state["messages_research"])]}
-
-
-
-
-
-class BasicToolNode:
-    """A node that runs the tools requested in the last AIMessage."""
-
-    def __init__(self, tools: list) -> None:
-        self.tools_by_name = {tool.name: tool for tool in tools}
-
-    
-
-    def __call__(self, inputs: dict):
-        research_mode = False
-        if messages := inputs.get("messages_explore", []):
-            message = messages[-1]
-        elif message := inputs.get("message_research", []):
-            message = messages[-1]
-            research_mode = True
-        else:
-            raise ValueError("No message found in input")
-        outputs = []
-        for tool_call in message.tool_calls:
-            tool_result = self.tools_by_name[tool_call["name"]].invoke(
-                tool_call["args"]
-            )
-            outputs.append(
-                ToolMessage(
-                    content=json.dumps(tool_result),
-                    name=tool_call["name"],
-                    tool_call_id=tool_call["id"],
-                )
-            )
-        if research_mode:
-            return {"message_research": outputs}
-        else :
-            return {"messages_explore": outputs}
-
-
-def route_tools(
-    state: State,
-):
-    """
-    Use in the conditional_edge to route to the ToolNode if the last message
-    has tool calls. Otherwise, route to the end.
-    """
-    list_of_ms = []
-    if messages := state.get("messages_explore", []):
-        list_of_ms += [messages[-1]]
-    if messages := state.get("messages_research", []):
-        list_of_ms += [messages[-1]]
-
-    for ai_message in list_of_ms:
-        if hasattr(ai_message, "tool_calls") and len(ai_message.tool_calls) > 0:
-            return "tools"
-    return END
+def route_tools(state: State):
+    return route_tools_by_messages(state.get("messages_explore", []))
 
 
 def format_products(State: State):
     final_message = State.get("messages_explore", [])[-1].content
     print(f"Final explore message: {final_message}")
     llm_with_structured_output = llm_gemini.with_structured_output(ProductSimpleList)
+    max_products = State.get("max_explore_products", 15)
     result = llm_with_structured_output.invoke([
         """
-        return just the product list in desired format. deduplicate the list and keep maximum 25 based on usp relevance to the query {query}.
-        """.format(query=State.get("query", "")) + final_message])
-        
+        return just the product list in desired format. deduplicate the list and keep maximum {max_products} based on usp relevance to the query {query}.
+        """.format(query=State.get("query", ""), max_products=max_products) + final_message])
+
     return {
         "products": [{
             "id": product["id"],
@@ -241,31 +127,35 @@ def format_products(State: State):
             "USP": product["USP"],
             "use_case": product["use_case"],
             "other_info": product["other_info"]
-        } for product in result.get("products", [])],
+        } for product in result.get("products", [])[:max_products]],
     }
 
+def call_product_research_tool(state: State):
+    crit = state.get("criteria", [])
+    inputs = [{"product": p, "criteria": crit} for p in state.get("products", [])]
+
+    eval_results = product_research_tool.batch(inputs, concurrency=len(inputs))
+    results = []
+    for product, eval_result in zip(state.get("products", []), eval_results):
+        if isinstance(eval_result, str):
+            results.append({
+                "product": product.get("id", "Unknown Product"),
+                "evaluation": eval_result
+            })
+    return {"research_results": results}
 
 
-def print_node(state: State):
-    print("Current state:")
-    print(state.get("messages_research", [])[-1].content)
-    return state
+
+
 
 graph_builder = StateGraph(State)
-tool_node_explore = BasicToolNode(tools=[tavily])
-tool_node_research = BasicToolNode(tools=[tavily])
+tool_node_explore = BasicToolNode(tools=[tavily], message_field="messages_explore")
 
 graph_builder.add_node("tool_node_explore", tool_node_explore)
-graph_builder.add_node("tool_node_research", tool_node_research)
 graph_builder.add_node("chatbot_explore", chatbot_explore)
 graph_builder.add_node("format_products", format_products)
-graph_builder.add_node("chatbot_research", chatbot_research)
-graph_builder.add_node("print_node", print_node)
+graph_builder.add_node("call_product_research_tool", call_product_research_tool)
 
-# The `tools_condition` function returns "tools" if the chatbot asks to use a tool, and "END" if
-# it is fine directly responding. This conditional routing defines the main agent loop.
-
-# Any time a tool is called, we return to the chatbot to decide the next step
 
 graph_builder.add_edge(START, "chatbot_explore")
 graph_builder.add_conditional_edges(
@@ -279,17 +169,16 @@ graph_builder.add_conditional_edges(
     {"tools": "tool_node_explore", END: "format_products"},
 )
 graph_builder.add_edge("tool_node_explore", "chatbot_explore")
-graph_builder.add_edge("format_products", END)
+graph_builder.add_edge("format_products", "call_product_research_tool")
+graph_builder.add_edge("call_product_research_tool", END)
 
 
-
-
-graph = graph_builder.compile()
+graph_explore = graph_builder.compile()
 
 if __name__ == "__main__":
 
-    def stream_graph_updates(user_input: str):
-        for event in graph.stream(
+    def stream_graph_updates():
+        for event in graph_explore.stream(
             
             {"query": "useful sleep tracker", 
         "criteria": ["price","accuracy of total sleep time", 
@@ -299,16 +188,13 @@ if __name__ == "__main__":
             "how to track my sleep with app if i am on a budge?",  
         #"are sleep tracking rings worth buying?",  
         #"are high end sleep tracking rings worth the price?"  
-        ], 
-        "messages_explore": [{"role": "user", "content": user_input}]}
+        ],
+        "max_explore_products": 2
+        }
         ):
             print("Event", event.keys())
             
 
-    while True:
-        user_input = input("User: ")
-        if user_input.lower() in ["quit", "exit", "q"]:
-            print("Goodbye!")
-            break
 
-        stream_graph_updates(user_input)
+
+    stream_graph_updates()

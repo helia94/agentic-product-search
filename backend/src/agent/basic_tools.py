@@ -7,7 +7,7 @@ import json
 
 
 llm_gemini = ChatGoogleGenerativeAI(
-    model="gemini-2.5-flash",
+    model="gemini-2.5-flash-lite",
     temperature=0,
     max_tokens=None,
     timeout=None,
@@ -16,7 +16,7 @@ llm_gemini = ChatGoogleGenerativeAI(
 
 
 tavily = TavilySearch(
-    max_results=1, #10
+    max_results=3, #10
     topic="general",
     #include_answer="advanced",
     #include_raw_content=True,
