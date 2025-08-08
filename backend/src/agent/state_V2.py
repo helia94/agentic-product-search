@@ -44,7 +44,7 @@ class QueryTips(BaseModel):
 
 
 class Criteria(TypedDict):
-    product: List[str] = Field(description ="List critical criteria to consider when buying a product.")
+    buying_criteria: List[str] = Field(description ="List critical criteria to consider when buying a product.")
 
     reasoning: str = Field(
         description="Reasoning behind the tips provided, explaining how they are critical to the buying decision."

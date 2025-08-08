@@ -191,41 +191,48 @@ def find_criteria(state: OverallState, config: RunnableConfig) -> OverallState:
 
         Task: I want to buy headphones for daily remote work calls in shared spaces, and I have these conditions: must be wireless, work with Mac, not over-ear
         Output:
-        ["mic clarity in noisy environments", "latency with MacOS apps", "fit comfort for 4h+ wear", "stable Bluetooth connection", "battery life with mic use"]
+        "buying_criteria": ["mic clarity in noisy environments", "latency with MacOS apps", "fit comfort for 4h+ wear", "stable Bluetooth connection", "battery life with mic use"]
 
 
         Task: I want to buy smart ring for stress tracking, and I have these conditions: must be comfortable to wear at night and discreet
         Output:
-        ["HRV tracking accuracy", "real-time stress alerts", "sleep data quality", "ring size comfort", "battery life in continuous mode"]
+        "buying_criteria": ["HRV tracking accuracy", "real-time stress alerts", "sleep data quality", "ring size comfort", "battery life in continuous mode"]
 
         4.
         Task: I want to buy app-based budgeting tool for freelancer income tracking, and I have these conditions: needs EU bank integration and VAT tagging
         Output:
-        ["multi-bank syncing reliability", "income/expense tagging flexibility", "VAT & invoice support", "report exports for tax filing", "mobile UX for quick edits"]
+        "buying_criteria": ["multi-bank syncing reliability", "income/expense tagging flexibility", "VAT & invoice support", "report exports for tax filing", "mobile UX for quick edits"]
 
         5.
         Task: I want to buy robot vacuum for pet hair removal, and I have these conditions: must avoid poop, work with dark floors, auto-empty optional
         Output:
-        ["hair pickup efficiency on hard floors", "object recognition and poop-avoidance", "suction vs noise tradeoff", "carpet edge transitions", "maintenance hassle"]
+        "buying_criteria": ["hair pickup efficiency on hard floors", "object recognition and poop-avoidance", "suction vs noise tradeoff", "carpet edge transitions", "maintenance hassle"]
 
         6.
         Task: I want to buy note-taking app for daily idea capture and link-based research, and I have these conditions: must work offline, exportable to markdown
         Output:
-        ["speed of quick capture", "linking and backlink UX", "offline stability", "search relevance", "export structure quality"]
+        "buying_criteria": ["speed of quick capture", "linking and backlink UX", "offline stability", "search relevance", "export structure quality"]
 
        
         the current task is for:
         I want to buy {product} for {use_case}, and I have these conditions: {conditions}.
+
+        now give list of "buying_criteria": 
     """
     formatted_prompt = instructions.format(
         product=product,
         use_case=use_case,
         conditions=conditions
     )
-    result: Criteria = structured_llm.invoke(formatted_prompt)
+    llm_result: Criteria = structured_llm.invoke(formatted_prompt)
+
+    try:
+        result = llm_result.buying_criteria
+    except AttributeError:
+        result = llm_result.get("buying_criteria", [])
 
     return {
-            "criteria": result.buying_criteria + ["price", "brand credibility"], 
+            "criteria": result + ["price", "brand credibility"], 
     }
 
 
@@ -408,7 +415,7 @@ def merge_product_info(state):
 builder = StateGraph(OverallState, config_schema=Configuration)
 
 # Define the nodes we will cycle between
-builder.add_node("pars_query", pars_query)
+builder.add_node("pars_query", pars_query) 
 builder.add_node("enrich_query", enrich_query)
 builder.add_node("human_ask_for_use_case", human_ask_for_use_case)
 builder.add_node("find_criteria", find_criteria)
