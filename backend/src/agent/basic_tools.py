@@ -49,13 +49,14 @@ llm_with_tools = llm_gemini.bind_tools(tools)
 class BasicToolNode:
     """A node that runs the tools requested in the last AIMessage."""
 
-    def __init__(self, tools: list, message_field: str) -> None:
+    def __init__(self, tools: list, message_field_input: str, message_field_output) -> None:
         self.tools_by_name = {tool.name: tool for tool in tools}
-        self.message_field = message_field
+        self.message_field_input = message_field_input
+        self.message_field_output = message_field_output
 
     
     def __call__(self, inputs: dict):
-        if messages := inputs.get(self.message_field, []):
+        if messages := inputs.get(self.message_field_input, []):
             message = messages[-1]
         else:
             raise ValueError("No message found in input")
@@ -73,7 +74,7 @@ class BasicToolNode:
                 )
             )
 
-        return {self.message_field: outputs}
+        return {self.message_field_output: outputs}
     
 
 def route_tools_by_messages(

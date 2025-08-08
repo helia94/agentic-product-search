@@ -181,7 +181,7 @@ def print_node(state: State):
     return state
 
 graph_builder = StateGraph(State)
-tool_node_research = BasicToolNode(tools=[tavily], message_field="messages_research")
+tool_node_research = BasicToolNode(tools=[tavily], message_field_input="messages_research")
 
 graph_builder.add_node("tool_node_research", tool_node_research)
 graph_builder.add_node("chatbot_research", chatbot_research)

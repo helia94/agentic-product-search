@@ -151,7 +151,7 @@ def call_product_research_tool(state: State):
 
 
 graph_builder = StateGraph(State)
-tool_node_explore = BasicToolNode(tools=[tavily], message_field="messages_explore")
+tool_node_explore = BasicToolNode(tools=[tavily], message_field_input="messages_explore", message_field_output="messages_explore")
 
 graph_builder.add_node("tool_node_explore", tool_node_explore)
 graph_builder.add_node("chatbot_explore", chatbot_explore)
