@@ -82,22 +82,49 @@ class ProductSimpleList(TypedDict):
 
 
 class ProductFull(TypedDict):
-    id: str
-    name: str
-    criteria: Dict[str, Any]
-    USP: str
-    use_case: str
-    price: float
-    country: str
-    year: int
-    review_summary: str
-    rating: float
-    reviews_count: int
-    image_url: str
-    product_url: str
+    id: str = Field(
+        description="Unique identifier for the product, used for tracking and retrieval."
+    )
+    name: str = Field(
+        description="Fully unique name of the product including model, specifications, and other distinguishing features."
+    )
+    criteria: Dict[str, str] = Field(
+        description="Dictionary of evaluation criteria for the product. Keys are criteria names, values are descriptions."
+    )
+    USP: str = Field(
+        description="Unique Selling Proposition of the product."
+    )
+    use_case: str = Field(
+        description="Primary use case for the product."
+    )
+    price: float = Field(
+        description="Price of the product. Do not say it depends, price should be a specific number."
+    )
+    country: str = Field(
+        description="Country where the product was design and produced. e.g. designed in Finland, produced in China."
+    )
+    year: int = Field(
+        description="Year of the product release."
+    )
+    review_summary: str = Field(
+        description="Summary of user reviews for the product. short keyword style, only informative words, no generic phrases like 'good product' or 'bad product'."
+    )
+    rating: str = Field(
+        description="User rating for the product. combination of rating and platform name (e.g. 4.5/5 on Amazon, 8.7/10 on TechRadar)."
+    )
+    reviews_count: str = Field(
+        description="Number of reviews for the product. This should be a specific number, not a range or estimate."
+    )
+    image_url: List[str] = Field(
+        description="List of URLs of the product image. At least one image URL is required. Max 3 URLs. Preferably from the official product page or a reputable retailer."
+    )
+    product_url: str = Field(
+        description="A url for the retailer offering the product in the given country. make sure the product is available for purchase in the given country. If not available, return original product_url with a warning."
+    )
 
 class OverallState(TypedDict):
     user_query: str
+    country: str
     query_breakdown: QueryBreakDown
     query_tips: QueryTips
     criteria: List[str]
