@@ -43,10 +43,11 @@ import json
 from langchain_core.messages import ToolMessage
 from langchain.globals import set_debug, set_verbose
 from agent.basic_tools import llm_gemini, llm_with_tools, route_tools_by_messages, BasicToolNode, tavily
-from agent.research_agent_graph import product_research_tool
+from agent.research_agent_graph import research_graph
 
 #set_debug(True)
 #set_verbose(True)
+
 
 
 
@@ -134,12 +135,13 @@ def call_product_research_tool(state: State):
     crit = state.get("criteria", [])
     inputs = [{"product": p, "criteria": crit} for p in state.get("products", [])]
 
-    eval_results = product_research_tool.batch(inputs, concurrency=len(inputs))
+    state_list = research_graph.batch(inputs, concurrency=len(inputs))
+    eval_results = [ s.get("messages_research", [])[-1].content for s in state_list]
     results = []
     for product, eval_result in zip(state.get("products", []), eval_results):
         if isinstance(eval_result, str):
             results.append({
-                "product": product.get("id", "Unknown Product"),
+                "product_id": product.get("id", "Unknown Product"),
                 "evaluation": eval_result
             })
     return {"research_results": results}

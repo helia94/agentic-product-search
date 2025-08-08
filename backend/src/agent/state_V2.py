@@ -104,8 +104,10 @@ class OverallState(TypedDict):
     queries: List[str]
     explored_products: List[ProductSimple]
     researched_products: List[str]
+    selected_product_ids: List[str]
     selected_products: List[ProductFull]
     selected_criteria: Criteria
     html_report: str
     max_explore_products: int
     max_research_products: int
+    max_explore_queries: int

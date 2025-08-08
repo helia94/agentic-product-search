@@ -125,30 +125,6 @@ from typing import Annotated, List
 
 
 
-@tool
-def product_research_tool(
-
-    product: Annotated[ProductSimple, "Product to research"],
-    criteria: Annotated[List[str], "Criteria to evaluate for the product"]
-    ):
-    """
-    Research a product based on criteria using the research agent graph.
-
-    Args:
-    product (ProductSimple): The product to research.
-    criteria (List[str]): The criteria to evaluate for the product.
-    Returns:
-    str: The research results as a string.
-    """ 
-
-    final_state = research_graph.invoke (
-        {
-            "product": product,
-            "criteria": criteria
-        }
-    )
-    return final_state.get("messages_research", [])[-1].content
-
 
 if __name__ == "__main__":
 

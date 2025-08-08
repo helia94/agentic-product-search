@@ -28,7 +28,9 @@ from pydantic import BaseModel, Field
 
 from langgraph.checkpoint.memory import InMemorySaver
 from agent.explore_agent_graph import graph_explore
-from agent.basic_tools import llm_gemini
+from langchain.globals import set_debug, set_verbose
+set_debug(True)
+#set_verbose(True)
 
 load_dotenv()
 
@@ -46,7 +48,15 @@ llm_llama3 = ChatGroq(
     max_retries=2,
 )
 
+llm_gemini = ChatGoogleGenerativeAI(
+    model="gemini-2.0-flash",
+    temperature=0,
+    max_tokens=None,
+    timeout=None,
+    max_retries=10,
+)
 
+#llm_gemini = llm_llama3
 
 # Nodes
 def pars_query(state: OverallState, config: RunnableConfig) -> OverallState:
@@ -178,10 +188,32 @@ def find_criteria(state: OverallState, config: RunnableConfig) -> OverallState:
         Max 5 criteria. But only very critical ones, do not just make a list. 
         this is not school. you will be rewarded by critical  thinking and quality of judgement, not number of words, what would a no bullshit expert say to his friend as advice.
         intentionally decide how specific or general the criteria should be.
-        example query: wearable sleep tracker with app for ios
 
-        output: ["accuracy of total sleep time", "accuracy of deep sleep stage", "IOS app insights and interpretability", "wearability", "long term support and updates", "battery life"]
+        Task: I want to buy headphones for daily remote work calls in shared spaces, and I have these conditions: must be wireless, work with Mac, not over-ear
+        Output:
+        ["mic clarity in noisy environments", "latency with MacOS apps", "fit comfort for 4h+ wear", "stable Bluetooth connection", "battery life with mic use"]
 
+
+        Task: I want to buy smart ring for stress tracking, and I have these conditions: must be comfortable to wear at night and discreet
+        Output:
+        ["HRV tracking accuracy", "real-time stress alerts", "sleep data quality", "ring size comfort", "battery life in continuous mode"]
+
+        4.
+        Task: I want to buy app-based budgeting tool for freelancer income tracking, and I have these conditions: needs EU bank integration and VAT tagging
+        Output:
+        ["multi-bank syncing reliability", "income/expense tagging flexibility", "VAT & invoice support", "report exports for tax filing", "mobile UX for quick edits"]
+
+        5.
+        Task: I want to buy robot vacuum for pet hair removal, and I have these conditions: must avoid poop, work with dark floors, auto-empty optional
+        Output:
+        ["hair pickup efficiency on hard floors", "object recognition and poop-avoidance", "suction vs noise tradeoff", "carpet edge transitions", "maintenance hassle"]
+
+        6.
+        Task: I want to buy note-taking app for daily idea capture and link-based research, and I have these conditions: must work offline, exportable to markdown
+        Output:
+        ["speed of quick capture", "linking and backlink UX", "offline stability", "search relevance", "export structure quality"]
+
+       
         the current task is for:
         I want to buy {product} for {use_case}, and I have these conditions: {conditions}.
     """
@@ -193,7 +225,7 @@ def find_criteria(state: OverallState, config: RunnableConfig) -> OverallState:
     result: Criteria = structured_llm.invoke(formatted_prompt)
 
     return {
-            "criteria": result.get("product", []) + ["price", "brand credibility"], 
+            "criteria": result.buying_criteria + ["price", "brand credibility"], 
     }
 
 
@@ -259,18 +291,21 @@ def query_generator(state: OverallState, config: RunnableConfig) -> OverallState
 
 
     the current task is for:
-        I want to buy {product} for {use_case}, and I have these criteria in mind: {criteria}. And these conditions: {conditions}.
+        I want to buy {product} for {use_case}, and I have these criteria in mind: {criteria}. And these conditions: {conditions}. out put maximum of {max_explore_queries} queries.
     """
+    
+    max_explore_queries=state.get("max_explore_queries", 10)
     formatted_prompt = instructions.format(
         product=product,
         use_case=use_case,
         conditions=conditions,
-        criteria=criteria
-    )
+        criteria=criteria,
+        max_explore_queries=max_explore_queries)
+    
     result: Queries = structured_llm.invoke(formatted_prompt)
 
     return {
-            "queries": result.get("queries", [])
+            "queries": result.get("queries", [])[:max_explore_queries]
     }
 
 
@@ -301,6 +336,74 @@ def call_product_search_graph(state: OverallState) -> OverallState:
         "researched_products": exploration_state.get("research_results", []),
     }
 
+
+def select_final_products(state: OverallState) -> OverallState:
+    """
+    Select the final products based on the researched products.
+    This function is used to finalize the product selection process.
+    """
+
+    query_str = json.dumps(state.get("query_breakdown", {}), indent=0, default=str)
+
+    products_full_info = merge_product_info(state) 
+
+    products_string = json.dumps(products_full_info, indent=0, default=str)
+
+    instructions = """ 
+        You are an expert product researcher. 
+       based on all research and price keep the products that have a competetiive advantage at least in one dimension. 
+       aim for maximum of {max_products_to_show} options, but less is also fine. 
+       something you would consider buying for yourself, do not be intellectual use common sense.
+       return a list of product ids you would consider buying. just the list, nothing else, no explanation, no text, no markdown, just the list of ids.
+       example output:
+       ["id1", "id2", "id3"]
+
+       here is the query you are trying to solve:
+       {query}
+
+       here is the list of products you should consider:
+        {products_string}
+       """
+    
+    max_products_to_show = state.get("max_research_products", 5)
+    instructions = instructions.format(
+        query=query_str,
+        max_products_to_show=max_products_to_show,
+        products_string=products_string
+    )
+
+    class ProductSelection(BaseModel):
+        products: List[str] = Field(
+            description="List of product IDs that are selected based on the research."
+        )
+
+        reasoning: str = Field(
+            description="Reasoning behind the selection of products, explaining how they compare in meet the user's needs."
+        )
+
+    llm_gemini_structured = llm_gemini.with_structured_output(ProductSelection)
+    results    = llm_gemini_structured.invoke(instructions)
+
+    return {
+        "selected_product_ids": results.products,
+    }
+
+def merge_product_info(state):
+    researched_products = state.get("researched_products", [])
+    explored_products = state.get("explored_products", [])
+    products_full_info = []
+
+    for product in researched_products:
+        product_id = product["product_id"]
+        product_info = next((p for p in explored_products if p["id"] == product_id), None)
+        if product_info:
+           # merge product info and product dicts
+            product.update(product_info)
+        products_full_info.append(product)
+    return products_full_info
+
+
+
 # Create our Agent Graph
 builder = StateGraph(OverallState, config_schema=Configuration)
 
@@ -311,6 +414,7 @@ builder.add_node("human_ask_for_use_case", human_ask_for_use_case)
 builder.add_node("find_criteria", find_criteria)
 builder.add_node("query_generator", query_generator)
 builder.add_node("call_product_search_graph", call_product_search_graph)
+builder.add_node("select_final_products", select_final_products)
 
 
 # Set the entrypoint as `planner`
@@ -328,7 +432,10 @@ builder.add_conditional_edges(
 builder.add_edge("human_ask_for_use_case", "find_criteria")
 builder.add_edge("find_criteria", "query_generator")
 builder.add_edge("query_generator", "call_product_search_graph")
-builder.add_edge("call_product_search_graph", END)
+builder.add_edge("call_product_search_graph", "select_final_products")
+builder.add_edge("select_final_products", END)
+
+
 checkpointer = InMemorySaver()
 
 graph = builder.compile(name="product-search-agent", checkpointer=checkpointer)
@@ -339,8 +446,9 @@ if __name__ == "__main__":
     # Test the graph with a sample state
     initial_state = OverallState(
         user_query="Find the best smart home devices",
-        max_explore_products=2,
-        max_research_products=2
+        max_explore_products=3,
+        max_research_products=1,
+        max_explore_queries=1,
     )
 
     config = {"configurable": {"thread_id": "some_id"}}

@@ -1,5 +1,6 @@
 
 from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain_groq import ChatGroq
 from langchain_tavily import TavilySearch
 from langchain_core.messages import ToolMessage
 from langgraph.graph import StateGraph, START, END
@@ -7,7 +8,15 @@ import json
 
 
 llm_gemini = ChatGoogleGenerativeAI(
-    model="gemini-2.5-flash-lite",
+    model="gemini-2.0-flash-lite",
+    temperature=0,
+    max_tokens=None,
+    timeout=None,
+    max_retries=10,
+)
+
+llm_llama3 = ChatGroq(
+    model="llama3-8b-8192",
     temperature=0,
     max_tokens=None,
     timeout=None,
@@ -15,8 +24,10 @@ llm_gemini = ChatGoogleGenerativeAI(
 )
 
 
+#llm_gemini = llm_llama3
+
 tavily = TavilySearch(
-    max_results=3, #10
+    max_results=2, #10
     topic="general",
     #include_answer="advanced",
     #include_raw_content=True,
@@ -26,6 +37,7 @@ tavily = TavilySearch(
     # time_range="day",
     #include_domains=["reddit.com/"],
     #exclude_domains=["*/blog/*"],
+
 )
 
 tools = [tavily]
