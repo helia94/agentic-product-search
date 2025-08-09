@@ -131,6 +131,7 @@ class OverallState(TypedDict):
     queries: List[str]
     explored_products: List[ProductSimple]
     researched_products: List[str]
+    completed_products: List[ProductFull]
     selected_product_ids: List[str]
     selected_products: List[ProductFull]
     selected_criteria: Criteria

@@ -220,10 +220,47 @@ def route_tools(state: FinalInfoState):
     return tools_setup.router("tools")(state)
 
 
-def print_node(state: FinalInfoState):
-    print("Current state:")
+def convert_to_product_full(state: FinalInfoState):
+    """
+    Convert the final_output string to a proper ProductFull object using LLM structured output.
+    """
     final_output = state.get("final_output", "")
-    print(final_output)
+    
+    if not final_output:
+        return {"product_output_formatted": None}
+    
+    llm_structured = llm_gemini.with_structured_output(ProductFull)
+    
+    conversion_prompt = """
+    Convert this product information into a properly structured ProductFull object.
+    Ensure all fields are correctly typed and formatted.
+    
+    Product information to convert:
+    {final_output}
+    """
+    
+    try:
+        formatted_prompt = conversion_prompt.format(final_output=final_output)
+        product_full = llm_structured.invoke(formatted_prompt)
+        return {
+            "product_output_formatted": product_full,
+            "product_output_string": final_output
+        }
+    except Exception as e:
+        print(f"Error converting to ProductFull: {e}")
+        return {
+            "product_output_formatted": None,
+            "product_output_string": final_output
+        }
+
+
+def print_node(state: FinalInfoState):
+    product_formatted = state.get("product_output_formatted", None)
+    if product_formatted:
+        product_name = getattr(product_formatted, 'name', None) or product_formatted.get('name', 'Unknown')
+        print(f"✅ ProductFull created: {product_name}")
+    else:
+        print("❌ ProductFull conversion failed")
     return state
 
 
@@ -234,6 +271,7 @@ def create_final_info_graph():
 
     graph_builder.add_node("tool_node_research", tool_node_research)
     graph_builder.add_node("chatbot_research", chatbot_research_with_pattern)
+    graph_builder.add_node("convert_to_product_full", convert_to_product_full)
     graph_builder.add_node("print_node", print_node)
 
     graph_builder.add_edge(START, "chatbot_research")
@@ -241,9 +279,10 @@ def create_final_info_graph():
     graph_builder.add_conditional_edges(
         "chatbot_research",
         route_tools,
-        {"tools": "tool_node_research", END: "print_node"},
+        {"tools": "tool_node_research", END: "convert_to_product_full"},
     )
     graph_builder.add_edge("tool_node_research", "chatbot_research")
+    graph_builder.add_edge("convert_to_product_full", "print_node")
     graph_builder.add_edge("print_node", END)
 
     return graph_builder.compile()

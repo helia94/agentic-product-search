@@ -44,7 +44,7 @@ from langchain.globals import set_debug, set_verbose
 from agent.basic_tools import llm_gemini, tavily
 from agent.tool_orchestrator import SimpleToolOrchestrator
 from agent.search_pattern import BaseSearchState, execute_search_pattern_flexible, SearchConfig
-from agent.research_agent_graph import research_graph
+from agent.research_with_pattern import research_graph_with_pattern
 
 #set_debug(True)
 #set_verbose(True)
@@ -222,7 +222,7 @@ def call_product_research_tool(state: State):
     crit = state.get("criteria", [])
     inputs = [{"product": p, "criteria": crit} for p in state.get("products", [])]
 
-    state_list = research_graph.batch(inputs, concurrency=len(inputs))
+    state_list = research_graph_with_pattern.batch(inputs, concurrency=len(inputs))
     eval_results = [ s.get("final_output") for s in state_list]
     results = []
     for product, eval_result in zip(state.get("products", []), eval_results):

@@ -28,6 +28,7 @@ from pydantic import BaseModel, Field
 
 from langgraph.checkpoint.memory import InMemorySaver
 from agent.explore_agent_graph import graph_explore
+from agent.final_info_graph import final_info_graph
 from langchain.globals import set_debug, set_verbose
 from langchain_core.rate_limiters import InMemoryRateLimiter
 
@@ -353,6 +354,139 @@ def call_product_search_graph(state: OverallState) -> OverallState:
     }
 
 
+def complete_product_info(state: OverallState) -> OverallState:
+    """
+    Complete missing ProductFull fields for selected products using final_info_graph.
+    This happens after product selection to enrich the final chosen products.
+    Uses batch processing for better performance.
+    """
+    selected_product_ids = state.get("selected_product_ids", [])
+    researched_products = state.get("researched_products", [])
+    explored_products = state.get("explored_products", [])
+    
+    # Prepare batch inputs for final_info_graph
+    inputs = []
+    product_context = []  # Keep track of research evaluations
+    
+    for product_id in selected_product_ids:
+        # Find the research result for this product
+        research_result = next((r for r in researched_products if r.get("product_id") == product_id), {})
+        evaluation = research_result.get("evaluation", "")
+        
+        # Find the corresponding product from explored_products
+        base_product = next((p for p in explored_products if p["id"] == product_id), {})
+        
+        # Prepare input for final_info_graph
+        product_input = {
+            "id": base_product.get("id", product_id),
+            "name": base_product.get("name", "Unknown Product"),
+            "criteria": dict(zip(state.get("criteria", []), ["unknown"] * len(state.get("criteria", [])))),  # Initialize criteria
+            "USP": base_product.get("USP", "unknown"),
+            "use_case": base_product.get("use_case", "unknown"),
+            "other_info": base_product.get("other_info", "")
+        }
+        
+        inputs.append({"product": product_input})
+        product_context.append({
+            "product_id": product_id,
+            "evaluation": evaluation,
+            "base_product": base_product
+        })
+    
+    # Batch process all products
+    try:
+        state_list = final_info_graph.batch(inputs, concurrency=len(inputs))
+        
+        # Process batch results - now using structured ProductFull objects
+        completed_products = []
+        for context, state_result in zip(product_context, state_list):
+            product_formatted = state_result.get("product_output_formatted", None)
+            
+            if product_formatted:
+                # Convert ProductFull to dict if needed
+                if hasattr(product_formatted, '__dict__'):
+                    completed_product = product_formatted.__dict__.copy()
+                else:
+                    completed_product = product_formatted.copy()
+                
+                completed_product["research_evaluation"] = context["evaluation"]
+                completed_products.append(completed_product)
+            else:
+                # Use base product as fallback
+                fallback_product = context["base_product"].copy()
+                fallback_product["research_evaluation"] = context["evaluation"]
+                fallback_product["full_info"] = product_formatted
+                completed_products.append(fallback_product)
+                
+    except Exception as e:
+        print(f"Error in batch processing: {e}")
+        # Complete fallback: return base products with research
+        completed_products = []
+        for context in product_context:
+            fallback_product = context["base_product"].copy()
+            fallback_product["research_evaluation"] = context["evaluation"]
+            completed_products.append(fallback_product)
+    
+    return {
+        "completed_products": completed_products
+    }
+
+
+def save_results_to_disk(state: OverallState) -> OverallState:
+    """
+    Save the complete state and final product information to disk files.
+    Creates timestamped files for both state and products.
+    """
+    import os
+    from datetime import datetime
+    
+    # Create results directory if it doesn't exist
+    results_dir = "results"
+    os.makedirs(results_dir, exist_ok=True)
+    
+    # Generate timestamp for filenames
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    
+    # Save complete state
+    try:
+        state_filename = f"{results_dir}/state_{timestamp}.json"
+        # Convert state to serializable format
+        serializable_state = {}
+        for key, value in state.items():
+            try:
+                # Test if value is JSON serializable
+                json.dumps(value, default=str)
+                serializable_state[key] = value
+            except (TypeError, ValueError):
+                # If not serializable, convert to string
+                serializable_state[key] = str(value)
+        
+        with open(state_filename, 'w', encoding='utf-8') as f:
+            json.dump(serializable_state, f, indent=2, default=str, ensure_ascii=False)
+        
+        print(f"✅ Complete state saved to: {state_filename}")
+        
+    except Exception as e:
+        print(f"❌ Error saving state: {e}")
+    
+    # Save final products
+    try:
+        products_filename = f"{results_dir}/products_{timestamp}.json"
+        completed_products = state.get("completed_products", [])
+        
+        with open(products_filename, 'w', encoding='utf-8') as f:
+            json.dump(completed_products, f, indent=2, default=str, ensure_ascii=False)
+        
+        print(f"✅ Final products saved to: {products_filename}")
+        print(f"📊 Saved {len(completed_products)} completed products")
+        
+    except Exception as e:
+        print(f"❌ Error saving products: {e}")
+    
+    # Return state unchanged (this is a side-effect only node)
+    return state
+
+
 def select_final_products(state: OverallState) -> OverallState:
     """
     Select the final products based on the researched products.
@@ -361,6 +495,7 @@ def select_final_products(state: OverallState) -> OverallState:
 
     query_str = json.dumps(state.get("query_breakdown", {}), indent=0, default=str)
 
+    # Use merged product info (back to original logic)
     products_full_info = merge_product_info(state) 
 
     products_string = json.dumps(products_full_info, indent=0, default=str)
@@ -430,7 +565,9 @@ builder.add_node("human_ask_for_use_case", human_ask_for_use_case)
 builder.add_node("find_criteria", find_criteria)
 builder.add_node("query_generator", query_generator)
 builder.add_node("call_product_search_graph", call_product_search_graph)
+builder.add_node("complete_product_info", complete_product_info)
 builder.add_node("select_final_products", select_final_products)
+builder.add_node("save_results_to_disk", save_results_to_disk)
 
 
 # Set the entrypoint as `planner`
@@ -449,7 +586,9 @@ builder.add_edge("human_ask_for_use_case", "find_criteria")
 builder.add_edge("find_criteria", "query_generator")
 builder.add_edge("query_generator", "call_product_search_graph")
 builder.add_edge("call_product_search_graph", "select_final_products")
-builder.add_edge("select_final_products", END)
+builder.add_edge("select_final_products", "complete_product_info")
+builder.add_edge("complete_product_info", "save_results_to_disk")
+builder.add_edge("save_results_to_disk", END)
 
 
 checkpointer = InMemorySaver()
