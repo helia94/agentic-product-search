@@ -2,7 +2,7 @@
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_groq import ChatGroq
 from langchain_tavily import TavilySearch
-from agent.tool_orchestrator import create_basic_tool_node, create_message_router
+from agent.tool_orchestrator import create_tool_node, create_tool_router
 
 
 llm_gemini = ChatGoogleGenerativeAI(
@@ -43,13 +43,11 @@ tools = [tavily]
 # Modification: tell the LLM which tools it can call  
 llm_with_tools = llm_gemini.bind_tools(tools)
 
-# Backward compatibility - use new orchestrator
-def BasicToolNode(tools: list, message_field_input: str, message_field_output: str):
-    """Legacy wrapper for backward compatibility"""
-    return create_basic_tool_node(tools, message_field_input, message_field_output)
+# Simple wrappers
+def BasicToolNode(tools, message_field_input, message_field_output):
+    return create_tool_node(tools, message_field_input, message_field_output)
 
 def route_tools_by_messages(messages, end_node="END"):
-    """Legacy wrapper for backward compatibility"""
     from langgraph.graph import END as LANGGRAPH_END
     
     if not messages:
