@@ -56,6 +56,7 @@ class BasicToolNode:
 
     
     def __call__(self, inputs: dict):
+        print("Running BasicToolNode")
         if messages := inputs.get(self.message_field_input, []):
             message = messages[-1]
         else:
@@ -63,6 +64,7 @@ class BasicToolNode:
         outputs = []
 
         for tool_call in message.tool_calls:
+            print("Running tool call:", tool_call["name"])
             tool_result = self.tools_by_name[tool_call["name"]].invoke(
                 tool_call["args"]
             )
