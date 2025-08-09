@@ -2,9 +2,7 @@
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_groq import ChatGroq
 from langchain_tavily import TavilySearch
-from langchain_core.messages import ToolMessage
-from langgraph.graph import StateGraph, START, END
-import json
+from agent.tool_orchestrator import create_basic_tool_node, create_message_router
 
 
 llm_gemini = ChatGoogleGenerativeAI(
@@ -42,55 +40,23 @@ tavily = TavilySearch(
 
 tools = [tavily]
 
-# Modification: tell the LLM which tools it can call
+# Modification: tell the LLM which tools it can call  
 llm_with_tools = llm_gemini.bind_tools(tools)
 
+# Backward compatibility - use new orchestrator
+def BasicToolNode(tools: list, message_field_input: str, message_field_output: str):
+    """Legacy wrapper for backward compatibility"""
+    return create_basic_tool_node(tools, message_field_input, message_field_output)
 
-class BasicToolNode:
-    """A node that runs the tools requested in the last AIMessage."""
-
-    def __init__(self, tools: list, message_field_input: str, message_field_output) -> None:
-        self.tools_by_name = {tool.name: tool for tool in tools}
-        self.message_field_input = message_field_input
-        self.message_field_output = message_field_output
-
+def route_tools_by_messages(messages, end_node="END"):
+    """Legacy wrapper for backward compatibility"""
+    from langgraph.graph import END as LANGGRAPH_END
     
-    def __call__(self, inputs: dict):
-        print("Running BasicToolNode")
-        if messages := inputs.get(self.message_field_input, []):
-            message = messages[-1]
-        else:
-            raise ValueError("No message found in input")
-        outputs = []
-
-        for tool_call in message.tool_calls:
-            print("Running tool call:", tool_call["name"])
-            tool_result = self.tools_by_name[tool_call["name"]].invoke(
-                tool_call["args"]
-            )
-            outputs.append(
-                ToolMessage(
-                    content=json.dumps(tool_result),
-                    name=tool_call["name"],
-                    tool_call_id=tool_call["id"],
-                )
-            )
-
-        return {self.message_field_output: outputs}
+    if not messages:
+        return end_node if end_node != "END" else LANGGRAPH_END
+        
+    last_message = messages[-1]
+    if hasattr(last_message, "tool_calls") and last_message.tool_calls:
+        return "tools"
     
-
-def route_tools_by_messages(
-    messages
-):
-    """
-    Use in the conditional_edge to route to the ToolNode if the last message
-    has tool calls. Otherwise, route to the end.
-    """
-    list_of_ms = []
-    if messages :
-        list_of_ms += [messages[-1]]
-
-    for ai_message in list_of_ms:
-        if hasattr(ai_message, "tool_calls") and len(ai_message.tool_calls) > 0:
-            return "tools"
-    return END
+    return end_node if end_node != "END" else LANGGRAPH_END

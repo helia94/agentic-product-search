@@ -17,7 +17,8 @@ from dotenv import load_dotenv
 load_dotenv()
 
 from agent.state_V2 import ProductSimple
-from agent.basic_tools import llm_gemini, llm_with_tools, route_tools_by_messages, BasicToolNode, tavily
+from agent.basic_tools import llm_gemini, tavily
+from agent.tool_orchestrator import AgentToolOrchestrator
 from agent.search_pattern import BaseSearchState, execute_search_pattern_flexible, create_product_research_config
 
 from langchain.globals import set_debug
@@ -38,6 +39,9 @@ class ProductResearchState(BaseSearchState):
     # tool_last_output: List[AIMessage]
     # final_output: str
 
+# Tool orchestrator for this agent
+tool_orchestrator = AgentToolOrchestrator(tools=[tavily])
+
 
 def chatbot_research_with_pattern(state: ProductResearchState):
     """
@@ -52,27 +56,27 @@ def chatbot_research_with_pattern(state: ProductResearchState):
     return execute_search_pattern_flexible(
         state=state,
         llm=llm_gemini,
-        llm_with_tools=llm_with_tools,
+        llm_with_tools=tool_orchestrator.get_llm_with_tools(llm_gemini),
         config=config
     )
 
 
 def route_tools(state: ProductResearchState):
-    """Your exact routing logic - unchanged"""
+    """Clean routing logic using tool orchestrator"""
     ai_queries = state.get("ai_queries", [])
     print(f"[DEBUG] route_tools called with {len(ai_queries)} ai_queries")
     if ai_queries:
         print(f"[DEBUG] Last ai_query has tool_calls: {hasattr(ai_queries[-1], 'tool_calls') and len(ai_queries[-1].tool_calls) > 0}")
     
-    result = route_tools_by_messages(ai_queries)
+    result = tool_orchestrator.create_router_function("tools")(state)
     print(f"[DEBUG] route_tools returning: {result}")
     return result
 
 
-# Your exact graph structure - unchanged
+# Your exact graph structure - cleaned up
 def create_research_graph():
     graph_builder = StateGraph(ProductResearchState)
-    tool_node_research = BasicToolNode(tools=[tavily], message_field_input="ai_queries", message_field_output="tool_last_output")
+    tool_node_research = tool_orchestrator.create_tool_node()
 
     graph_builder.add_node("tool_node_research", tool_node_research)
     graph_builder.add_node("chatbot_research", chatbot_research_with_pattern)  # Only change: use pattern
