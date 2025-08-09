@@ -29,6 +29,8 @@ from pydantic import BaseModel, Field
 from langgraph.checkpoint.memory import InMemorySaver
 from agent.explore_agent_graph import graph_explore
 from langchain.globals import set_debug, set_verbose
+from langchain_core.rate_limiters import InMemoryRateLimiter
+
 set_debug(True)
 #set_verbose(True)
 
@@ -39,6 +41,12 @@ if os.getenv("GEMINI_API_KEY") is None:
 
 # Used for Google Search API
 #genai_client = Client(api_key=os.getenv("GEMINI_API_KEY"))
+
+rate_limiter = InMemoryRateLimiter(
+    requests_per_second=0.2,  # 1 request every 5 seconds
+    check_every_n_seconds=0.1,
+    max_bucket_size=1  # No burst requests
+)
 
 llm_llama3 = ChatGroq(
     model="llama3-8b-8192",
@@ -54,6 +62,7 @@ llm_gemini = ChatGoogleGenerativeAI(
     max_tokens=None,
     timeout=None,
     max_retries=10,
+    rate_limiter=rate_limiter,
 )
 
 #llm_gemini = llm_llama3

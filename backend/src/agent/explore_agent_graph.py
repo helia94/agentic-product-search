@@ -6,7 +6,6 @@ from datetime import datetime
 
 from dotenv import load_dotenv
 
-from agent.basic_tools import route_tools_by_messages
 load_dotenv()
 from langchain_core.messages import AIMessage
 from langgraph.types import Send
@@ -42,7 +41,9 @@ import json
 
 from langchain_core.messages import ToolMessage
 from langchain.globals import set_debug, set_verbose
-from agent.basic_tools import llm_gemini, llm_with_tools, route_tools_by_messages, BasicToolNode, tavily
+from agent.basic_tools import llm_gemini, tavily
+from agent.tool_orchestrator import SimpleToolOrchestrator
+from agent.search_pattern import BaseSearchState, execute_search_pattern_flexible, SearchConfig
 from agent.research_agent_graph import research_graph
 
 #set_debug(True)
@@ -51,7 +52,7 @@ from agent.research_agent_graph import research_graph
 
 
 
-class State(TypedDict):
+class State(BaseSearchState):
     query: str
     queries: List[str]
     criteria: List[str]
@@ -60,66 +61,152 @@ class State(TypedDict):
     research_results: List[str]
     max_explore_products: int
     max_research_products: int
+    
+    # BaseSearchState provides:
+    # ai_queries: Annotated[List[AIMessage], add_messages]
+    # tool_saved_info: Annotated[List[str], add_messages]
+    # tool_last_output: List[AIMessage]
+    # final_output: str
 
- 
-def chatbot_explore(state: State):
-    queries = " ".join(state.get("queries", []))
-    max_explore_products = state.get("max_explore_products", 15)
+# Tool setup
+tools_setup = SimpleToolOrchestrator([tavily], "ai_queries", "tool_last_output")
 
-    instructions = """
-        your task is to go through a list of search queries, call search tool on each, and then extract products from the search results.
-        Search for this query using your tools and convert whatever response you find in them into a list of mentioned products with [brand, product_name, unique_selling_point, any_other_product_info]. 
-        the first response should be a tool call, after getting the results you have two tasks. Discover and format products from the search results, call the search tool again with the next query. 
-        When you have no more queries, or you reach {max_explore_products} products without duplicates, return the list of products you found. The product should be super specific model name, not just category or brand, fully unique and pricable .
 
-        here is an example of the product list you should return:
-
+def create_product_explore_config() -> SearchConfig:
+    """Configuration for product exploration search pattern"""
+    
+    return SearchConfig(
+        analyze_prompt="""
+        <SYSTEM>
+        You are a product discovery expert who extracts specific product information from search results.
+        You focus on finding concrete, specific product models with clear specifications.
+        </SYSTEM>
+        
+        <INSTRUCTIONS>
+        Analyze the search results and extract specific products mentioned:
+        - Look for specific product models, not just categories or brands
+        - Extract key details: brand, model name, key features, pricing if available
+        - Focus on products that match the search query: {query}
+        - Ignore vague or general information
+        
+        Return your findings as a list of insights about specific products found.
+        </INSTRUCTIONS>
+        
+        <INPUT>
+        query: {query}
+        queries_remaining: {queries}
+        last_tool_call_arguments: {last_tool_call_arguments}
+        last_tool_call_output: {last_tool_call_output}
+        max_products: {max_explore_products}
+        </INPUT>
+        """,
+        
+        search_prompt="""
+        <SYSTEM>
+        You are a product discovery expert searching for specific products based on user queries.
+        Your goal is to find concrete, purchasable products that match the user's needs.
+        </SYSTEM>
+        
+        <INSTRUCTIONS>
+        Search for products based on the remaining queries:
+        - Process queries one by one: {queries}
+        - Search for specific products, models, and brands
+        - You have already searched {len_ai_queries} times
+        - Don't repeat previous searches: {ai_queries}
+        - Focus on finding purchasable, specific product models
+        - Stop when you have enough products ({max_explore_products}) or no more queries
+        
+        Use the search tool to find products or return nothing if done.
+        </INSTRUCTIONS>
+        
+        <INPUT>
+        query: {query}
+        queries: {queries}
+        max_explore_products: {max_explore_products}
+        tool_saved_info: {tool_saved_info}
+        ai_queries: {ai_queries}
+        </INPUT>
+        """,
+        
+        format_prompt="""
+        <SYSTEM>
+        You are a product discovery expert who formats found products into a structured list.
+        </SYSTEM>
+        
+        <INSTRUCTIONS>
+        Format all discovered products into a JSON list with this exact structure:
+        
         [
             {{
-                "id": "fitbit-charge-6",
-                "name": "Fitbit Charge 6",
-                "USP": "GPS, Google, ECG",
-                "use_case": "Serious fitness tracking",
-                "other_info": "40+ modes, 7-day battery, $160"
-            }},
-            {{
-                "id": "fitbit-inspire-3",
-                "name": "Fitbit Inspire 3",
-                "USP": "Long battery, cheap",
-                "use_case": "Basic daily tracking",
-                "other_info": "20+ modes, SpO2, $99"
+                "id": "product-model-name",
+                "name": "Brand Product Model",
+                "USP": "Key selling point",
+                "use_case": "Primary use case",
+                "other_info": "Price, battery, specs"
             }}
         ]
+        
+        Requirements:
+        - Maximum {max_explore_products} products
+        - Only specific, purchasable product models
+        - Deduplicate similar products
+        - Focus on products matching query: {query}
+        </INSTRUCTIONS>
+        
+        <INPUT>
+        query: {query}
+        queries: {queries}
+        max_explore_products: {max_explore_products}
+        tool_saved_info: {tool_saved_info}
+        </INPUT>
+        """,
+        
+        state_field_mapping={
+            "query": "query",
+            "queries": "queries",
+            "max_explore_products": "max_explore_products"
+        },
+        
+        max_searches=2
+    )
 
 
-        here is the list of queries you should search for:
-        {queries}
-
-        here are are the past messages:
-
-        """
-    system_prompt = instructions.format(
-        queries=queries, 
-        max_explore_products=max_explore_products)
-
-    return {"messages_explore": [llm_with_tools.invoke([system_prompt] + state["messages_explore"])]}
+def chatbot_explore(state: State):
+    """
+    Product exploration using the search pattern
+    """
+    config = create_product_explore_config()
+    
+    return execute_search_pattern_flexible(
+        state=state,
+        llm=llm_gemini,
+        llm_with_tools=tools_setup.bind_tools_to_llm(llm_gemini),
+        config=config
+    )
 
  
 
 
 def route_tools(state: State):
-    return route_tools_by_messages(state.get("messages_explore", []))
+    """Route based on ai_queries for search pattern"""
+    return tools_setup.router("tools")(state)
 
 
-def format_products(State: State):
-    final_message = State.get("messages_explore", [])[-1].content
-    print(f"Final explore message: {final_message}")
+def format_products(state: State):
+    """Format final_output from search pattern into structured products"""
+    final_output = state.get("final_output", "")
+    print(f"Final explore output: {final_output}")
+    
     llm_with_structured_output = llm_gemini.with_structured_output(ProductSimpleList)
-    max_products = State.get("max_explore_products", 15)
-    result = llm_with_structured_output.invoke([
-        """
-        return just the product list in desired format. deduplicate the list and keep maximum {max_products} based on usp relevance to the query {query}.
-        """.format(query=State.get("query", ""), max_products=max_products) + final_message])
+    max_products = state.get("max_explore_products", 15)
+    
+    result = llm_with_structured_output.invoke(f"""
+    Extract and format the product list from this text into the required structure.
+    Deduplicate and keep maximum {max_products} products based on relevance to query: {state.get("query", "")}
+    
+    Text to process:
+    {final_output}
+    """)
 
     return {
         "products": [{
@@ -136,7 +223,7 @@ def call_product_research_tool(state: State):
     inputs = [{"product": p, "criteria": crit} for p in state.get("products", [])]
 
     state_list = research_graph.batch(inputs, concurrency=len(inputs))
-    eval_results = [ s.get("messages_research", [])[-1].content for s in state_list]
+    eval_results = [ s.get("final_output") for s in state_list]
     results = []
     for product, eval_result in zip(state.get("products", []), eval_results):
         if isinstance(eval_result, str):
@@ -151,26 +238,22 @@ def call_product_research_tool(state: State):
 
 
 graph_builder = StateGraph(State)
-tool_node_explore = BasicToolNode(tools=[tavily], message_field_input="messages_explore", message_field_output="messages_explore")
 
-graph_builder.add_node("tool_node_explore", tool_node_explore)
+# Use new tool orchestration
+tool_node_explore = tools_setup.tool_node()
+
+graph_builder.add_node("tools", tool_node_explore)  # Renamed to match router expectation
 graph_builder.add_node("chatbot_explore", chatbot_explore)
 graph_builder.add_node("format_products", format_products)
 graph_builder.add_node("call_product_research_tool", call_product_research_tool)
-
 
 graph_builder.add_edge(START, "chatbot_explore")
 graph_builder.add_conditional_edges(
     "chatbot_explore",
     route_tools,
-    # The following dictionary lets you tell the graph to interpret the condition's outputs as a specific node
-    # It defaults to the identity function, but if you
-    # want to use a node named something else apart from "tools",
-    # You can update the value of the dictionary to something else
-    # e.g., "tools": "my_tools"
-    {"tools": "tool_node_explore", END: "format_products"},
+    {"tools": "tools", END: "format_products"},
 )
-graph_builder.add_edge("tool_node_explore", "chatbot_explore")
+graph_builder.add_edge("tools", "chatbot_explore")
 graph_builder.add_edge("format_products", "call_product_research_tool")
 graph_builder.add_edge("call_product_research_tool", END)
 

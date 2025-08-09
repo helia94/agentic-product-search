@@ -2,15 +2,26 @@
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_groq import ChatGroq
 from langchain_tavily import TavilySearch
+from langchain_core.rate_limiters import InMemoryRateLimiter
 from agent.tool_orchestrator import create_tool_node, create_tool_router
+from langchain_google_vertexai import ChatVertexAI
 
+import os
 
-llm_gemini = ChatGoogleGenerativeAI(
+# Rate limiter for Gemini API to avoid rate limits
+rate_limiter = InMemoryRateLimiter(
+    requests_per_second=0.2,  # 1 request every 5 seconds
+    check_every_n_seconds=0.1,
+    max_bucket_size=1  # No burst requests
+)
+
+llm_gemini = ChatVertexAI(
     model="gemini-2.0-flash-lite",
     temperature=0,
     max_tokens=None,
     timeout=None,
     max_retries=10,
+    rate_limiter=rate_limiter,
 )
 
 llm_llama3 = ChatGroq(

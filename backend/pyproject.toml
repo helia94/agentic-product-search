@@ -27,7 +27,8 @@ dependencies = [
     "langchain-groq",
     "langchain-tavily",
     "langchain-community",
-    "praw"
+    "praw",
+    "langchain-google-vertexai"
 ]
 
 
