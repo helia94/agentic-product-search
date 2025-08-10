@@ -3,7 +3,10 @@
     "allow": [
       "Bash(python:*)",
       "Bash(timeout 30 python:*)",
-      "Bash(set PYTHONPATH=%cd%src)"
+      "Bash(set PYTHONPATH=%cd%src)",
+      "WebFetch(domain:python.langchain.com)",
+      "WebFetch(domain:api.python.langchain.com)",
+      "WebFetch(domain:langchain-ai.github.io)"
     ],
     "deny": []
   }

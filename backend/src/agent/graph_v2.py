@@ -26,7 +26,7 @@ from langgraph.types import interrupt, Command
 from typing import List
 from pydantic import BaseModel, Field
 
-from langgraph.checkpoint.memory import InMemorySaver
+from langgraph.checkpoint.sqlite import SqliteSaver
 from agent.explore_agent_graph import graph_explore
 from agent.final_info_graph import final_info_graph
 from langchain.globals import set_debug, set_verbose
@@ -380,53 +380,25 @@ def complete_product_info(state: OverallState) -> OverallState:
         product_input = {
             "id": base_product.get("id", product_id),
             "name": base_product.get("name", "Unknown Product"),
-            "criteria": dict(zip(state.get("criteria", []), ["unknown"] * len(state.get("criteria", [])))),  # Initialize criteria
+            "criteria_keys": state.get("criteria", []),
+            "criteria_values": evaluation,
             "USP": base_product.get("USP", "unknown"),
             "use_case": base_product.get("use_case", "unknown"),
             "other_info": base_product.get("other_info", "")
         }
         
         inputs.append({"product": product_input})
-        product_context.append({
-            "product_id": product_id,
-            "evaluation": evaluation,
-            "base_product": base_product
-        })
+
     
     # Batch process all products
-    try:
-        state_list = final_info_graph.batch(inputs, concurrency=len(inputs))
-        
-        # Process batch results - now using structured ProductFull objects
-        completed_products = []
-        for context, state_result in zip(product_context, state_list):
-            product_formatted = state_result.get("product_output_formatted", None)
-            
-            if product_formatted:
-                # Convert ProductFull to dict if needed
-                if hasattr(product_formatted, '__dict__'):
-                    completed_product = product_formatted.__dict__.copy()
-                else:
-                    completed_product = product_formatted.copy()
-                
-                completed_product["research_evaluation"] = context["evaluation"]
-                completed_products.append(completed_product)
-            else:
-                # Use base product as fallback
-                fallback_product = context["base_product"].copy()
-                fallback_product["research_evaluation"] = context["evaluation"]
-                fallback_product["full_info"] = product_formatted
-                completed_products.append(fallback_product)
-                
-    except Exception as e:
-        print(f"Error in batch processing: {e}")
-        # Complete fallback: return base products with research
-        completed_products = []
-        for context in product_context:
-            fallback_product = context["base_product"].copy()
-            fallback_product["research_evaluation"] = context["evaluation"]
-            completed_products.append(fallback_product)
+    state_list = final_info_graph.batch(inputs, concurrency=len(inputs))
     
+    # Process batch results - now using structured ProductFull objects
+    completed_products = []
+    for state_result in state_list:
+        product_formatted = state_result.get("product_output_string", None)
+        completed_products.append(product_formatted)
+
     return {
         "completed_products": completed_products
     }
@@ -506,6 +478,7 @@ def select_final_products(state: OverallState) -> OverallState:
        aim for maximum of {max_products_to_show} options, but less is also fine. 
        something you would consider buying for yourself, do not be intellectual use common sense.
        return a list of product ids you would consider buying. just the list, nothing else, no explanation, no text, no markdown, just the list of ids.
+       you have at least select two
        example output:
        ["id1", "id2", "id3"]
 
@@ -535,8 +508,14 @@ def select_final_products(state: OverallState) -> OverallState:
     llm_gemini_structured = llm_gemini.with_structured_output(ProductSelection)
     results    = llm_gemini_structured.invoke(instructions)
 
+    result_list = results.products
+
+    if not result_list:
+        result_list = [products_full_info[0]["id"]]  # Fallback to first product if none selected
+        
+
     return {
-        "selected_product_ids": results.products,
+        "selected_product_ids": result_list
     }
 
 def merge_product_info(state):
@@ -591,23 +570,78 @@ builder.add_edge("complete_product_info", "save_results_to_disk")
 builder.add_edge("save_results_to_disk", END)
 
 
-checkpointer = InMemorySaver()
+# Create persistent SQLite checkpointer that survives process restarts
+import sqlite3
+checkpointer = SqliteSaver(sqlite3.connect("checkpoints.db", check_same_thread=False))
 
 graph = builder.compile(name="product-search-agent", checkpointer=checkpointer)
 
 
 
 if __name__ == "__main__":
+    # Configuration options - change these to control execution
+    RUN_FROM_BEGINNING = False  # Set to True to run from start, False to resume
+    RESUME_FROM_NODE = "select_final_products"  # Node name to resume from
+    THREAD_ID = "some_id"  # Keep consistent for checkpoint persistence
+    
     # Test the graph with a sample state
     initial_state = OverallState(
         user_query="sleep tracking device with app",
         max_explore_products=2,
         max_research_products=2,
-        max_explore_queries=2,
+        max_explore_queries=5,
     )
 
-    config = {"configurable": {"thread_id": "some_id"}}
-    result_state = graph.invoke(initial_state, config=config)
-
-    result_state = graph.invoke(Command(resume="2"), config=config)
-    print(json.dumps(result_state, indent=2, default=str))
+    config = {"configurable": {"thread_id": THREAD_ID}}
+    
+    if RUN_FROM_BEGINNING:
+        print("🚀 Running from beginning...")
+        result_state = graph.invoke(initial_state, config=config)
+        result_state = graph.invoke(Command(resume="2"), config=config)
+        print("✅ Execution completed from beginning")
+        print(json.dumps(result_state, indent=2, default=str))
+    else:
+        print(f"🔄 Attempting to resume from node: {RESUME_FROM_NODE}")
+        
+        # Get state history from last run
+        print("📋 Getting state history from last run...")
+        state_history = list(graph.get_state_history(config))
+        
+        # Find checkpoint at the specified node
+        checkpoint_id = None
+        for state in state_history:
+            if state.next == (RESUME_FROM_NODE,):  # Node about to execute
+                checkpoint_id = state.config["configurable"]["checkpoint_id"]
+                print(f"✅ Found checkpoint at {RESUME_FROM_NODE}: {checkpoint_id}")
+                break
+        
+        if checkpoint_id:
+            # Resume from that checkpoint with updated code
+            print(f"🔄 Resuming from {RESUME_FROM_NODE} checkpoint...")
+            resume_config = {
+                "configurable": {
+                    "thread_id": THREAD_ID, 
+                    "checkpoint_id": checkpoint_id
+                }
+            }
+            result_state = graph.invoke(None, config=resume_config)
+            print("✅ Resumed execution completed")
+            print(json.dumps(result_state, indent=2, default=str))
+        else:
+            print(f"❌ Could not find checkpoint at {RESUME_FROM_NODE}")
+            print(f"Available checkpoints ({len(state_history)} total):")
+            for i, state in enumerate(state_history):
+                print(f"{i}: next={state.next}, checkpoint_id={state.config['configurable']['checkpoint_id']}")
+            
+            if len(state_history) == 0:
+                print("\n💡 No checkpoints found. Running from beginning...")
+                result_state = graph.invoke(initial_state, config=config)
+            else:
+                print(f"\n💡 Available nodes to resume from:")
+                unique_nodes = set()
+                for state in state_history:
+                    if state.next:
+                        unique_nodes.add(state.next[0])
+                for node in sorted(unique_nodes):
+                    print(f"  - {node}")
+                print(f"\nChange RESUME_FROM_NODE to one of these and run again.") 

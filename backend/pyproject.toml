@@ -28,7 +28,8 @@ dependencies = [
     "langchain-tavily",
     "langchain-community",
     "praw",
-    "langchain-google-vertexai"
+    "langchain-google-vertexai",
+    "langgraph-checkpoint-sqlite"
 ]
 
 

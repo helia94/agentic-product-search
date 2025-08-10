@@ -56,11 +56,17 @@ def create_final_info_config() -> SearchConfig:
 
         <INSTRUCTIONS>
         Extract key product information from the search results:
-        - Release year, manufacture country
-        - User ratings, review counts, review summaries
-        - Product URLs, image URLs
-        - Any other ProductFull fields that were missing
-        
+        "USP": "One-sentence unique selling proposition.",
+        "use_case": "Primary context or user segment.",
+        "country": "Design and manufacturing origin (e.g., 'Designed in FI, made in CN').",
+        "year": "Release year (YYYY).",
+        "review_summary": "Keyword-style user review highlights; no fluff.",
+        "rating": "Score plus source (e.g., '4.5/5 on Amazon').",
+        "reviews_count": "Exact review count; no ranges.",
+        "image_url": "1–3 image URLs, prefer official/reputable.",
+        "product_url": "Retailer link for the specified country; note if unavailable."
+         any other nuance interesting info you found nothing generic
+
         Focus on factual data, avoid marketing fluff.
         Return insights as a list of strings.
         </INSTRUCTIONS>
@@ -77,27 +83,36 @@ def create_final_info_config() -> SearchConfig:
         You are a product research agent.
 
         <TASK>
-        For the given product, FILL all remaining fields in the `ProductFull` class.
-        Use the SEARCH TOOL if any field is missing (except: `criteria`, `USP`, `use_case` — these are already provided).
+        For the given product, FILL all remaining fields. 
+        Use the SEARCH TOOL if any field is missing.
         Return either:
         - a search tool call (with precise query string), OR
         - nothing if you have enough information.
+        we need these fields in order of importance:
+        "product_url": "Retailer link for the specified country; note if unavailable."
+        "image_url": "1–3 image URLs, prefer official/reputable.",
+        "review_summary": "Keyword-style user review highlights; no fluff.",
+        "rating": "Score plus source (e.g., '4.5/5 on Amazon').",
+        "reviews_count": "Exact review count; no ranges.",
+        "USP": "One-sentence unique selling proposition.",
+        "use_case": "Primary context or user segment.",
+        "country": "Design and manufacturing origin (e.g., 'Designed in FI, made in CN').",
+        "year": "Release year (YYYY).",
         </TASK>
 
         <CONSTRAINTS>
-        - Max 4 searches per product. Prefer getting everything in 1 or 2 searches. You already used {len_ai_queries} searches.
+        - Max 8 searches per product. You already used {len_ai_queries} searches.
         - Be concise, avoid fluff. Use info-dense, direct language.
-        - If a value is unknown or unverifiable, write `"unknown"` (never guess).
         - Review summaries = keyword-only, no generic opinions (e.g., say "short battery, clean app" not "great product").
         - Image URLs: 1–3, from official or reputable retailers.
         - Product URL must be live and specific to given country; if not available, include original URL + warning.
         - Stop and return empty if product model is unclear.
-        - DO NOT search for information you already have in tool_saved_info or in product info input.
+        - DO NOT search for information you already have in tool_saved_info or in product info input. check all we have first before writing queries.
         - DO NOT repeat queries in ai_queries.
         - New search query should be significantly different from previous ones.
         - Use function calling for the search
         - DO NOT use include_domains
-        - DO NOT bundle not related key words in search like manufacture country, user ratings, review count, review summaries, official product images
+        - DO NOT BUNDLE unrelated key words in search like "manufacture country, user ratings, review count, review summaries, official product images
         - Either search for each missing field individually, or use general query like honest reviews of X
         - image_url is very important always include it
         </CONSTRAINTS>
@@ -137,26 +152,31 @@ def create_final_info_config() -> SearchConfig:
         </SYSTEM>
 
         <INSTRUCTIONS>
-        Create a fully completed ProductFull dictionary using all gathered information.
-        
-        FILL all remaining fields in the `ProductFull` class:
-        - id: Create from product name and year (e.g., "withings_sleep_analyzer_2020")
-        - name: Full product name
-        - criteria: Already provided
-        - USP: Already provided  
-        - use_case: Already provided
-        - price: Numeric value
-        - country: Design/manufacture origin
-        - year: Release year
-        - review_summary: Keyword-only, no generic opinions
-        - rating: Format like "4.2/5 on Amazon"
-        - reviews_count: String number
-        - image_url: List of 1-3 URLs
-        - product_url: Live, specific URL
+        Create a fully completed product information json using all gathered information.
+        YOU HAVE TO RETURN A VALID JSON.
+        Put all the gathered information into the appropriate fields.
+        DO NOT add any extra fluff or jargon this is not a report.
+        It should make decision making easier and more informative. 
+        This is for the buyer not for the brands.
+
+        FILL all remaining json fields:
+        "id": "Internal unique ID for tracking/retrieval. Inside product info.",
+        "name": "Fully qualified product name incl. model/specs. Inside product info.",
+        "criteria": "Dict of {{criterion: brief value/notes}}. Inside product info under evaluation.",
+        "USP": "One-line unique advantage. Inside product info or tool_saved_info.",
+        "use_case": "Primary intended user/usage. Inside product info or tool_saved_info.",
+        "price": "Exact numeric price (no ranges). Inside product info.",
+        "country": "Design and manufacture line (e.g., 'Designed in X, made in Y'). Inside tool_saved_info.",
+        "year": "Release year (YYYY). Inside tool_saved_info.",
+        "review_summary": "Comma-separated review keywords (no fluff). Inside tool_saved_info or product.",
+        "rating": "Score + source (e.g., '4.6/5 on Amazon').  Inside tool_saved_info.",
+        "reviews_count": "Exact review count at the source.  Inside tool_saved_info.",
+        "image_url": "1–3 image URLs (official/reputable).  Inside tool_saved_info.",
+        "product_url": "Retailer URL for target country; otherwise original with warning. Inside tool_saved_info."
         
         If any field cannot be determined from the research, use "unknown".
         Return valid JSON format for ProductFull.
-        
+        </INSTRUCTIONS>
         <EXAMPLES>
         
         # ✅ EXAMPLE OUTPUT
@@ -182,7 +202,6 @@ def create_final_info_config() -> SearchConfig:
             "product_url": "https://www.withings.com/fr/en/sleep-analyzer"
         }}
         </EXAMPLES>
-        </INSTRUCTIONS>
 
         <INPUT>
         product: {product}
@@ -194,7 +213,7 @@ def create_final_info_config() -> SearchConfig:
             "product": "product"
         },
         
-        max_searches=4
+        max_searches=8
     )
 
 
@@ -218,6 +237,43 @@ def chatbot_research_with_pattern(state: FinalInfoState):
 def route_tools(state: FinalInfoState):
     """Simple routing logic"""
     return tools_setup.router("tools")(state)
+
+
+def validate_and_fix_json(state: FinalInfoState):
+    """
+    Validate if final_output is valid JSON, if not use LLM to fix it without schemas.
+    """
+    final_output = state.get("final_output", "")
+    
+    if not final_output:
+        return {"product_output_string": ""}
+    
+    # Try to parse as JSON first
+    try:
+        json.loads(final_output)
+        return {"product_output_string": final_output}
+    except json.JSONDecodeError:
+        # If invalid JSON, use LLM to fix it
+        fix_prompt = """
+        The following text should be valid JSON but it's malformed. 
+        Fix it to be valid JSON without changing the content meaning.
+        Return only the fixed JSON, no explanations or markdown.
+        
+        Text to fix:
+        {final_output}
+        """
+        
+        try:
+            formatted_prompt = fix_prompt.format(final_output=final_output)
+            fixed_json = llm_gemini.invoke(formatted_prompt).content
+            
+            # Validate the fixed JSON
+            json.loads(fixed_json)
+            return {"product_output_string": fixed_json}
+            
+        except (json.JSONDecodeError, Exception) as e:
+            print(f"Error fixing JSON: {e}")
+            return {"product_output_string": final_output}
 
 
 def convert_to_product_full(state: FinalInfoState):
@@ -271,8 +327,8 @@ def create_final_info_graph():
 
     graph_builder.add_node("tool_node_final_info", tool_node_research)
     graph_builder.add_node("final_info_chatbot", chatbot_research_with_pattern)
-    graph_builder.add_node("format_final_info", convert_to_product_full)
-    graph_builder.add_node("print_node", print_node)
+    graph_builder.add_node("format_final_info", validate_and_fix_json)
+
 
     graph_builder.add_edge(START, "final_info_chatbot")
 
