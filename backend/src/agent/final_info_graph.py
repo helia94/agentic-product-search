@@ -85,7 +85,7 @@ def create_final_info_config() -> SearchConfig:
         </TASK>
 
         <CONSTRAINTS>
-        - Max 5 searches per product. Prefer getting everything in 1 or 2 searches. You already used {len_ai_queries} searches.
+        - Max 4 searches per product. Prefer getting everything in 1 or 2 searches. You already used {len_ai_queries} searches.
         - Be concise, avoid fluff. Use info-dense, direct language.
         - If a value is unknown or unverifiable, write `"unknown"` (never guess).
         - Review summaries = keyword-only, no generic opinions (e.g., say "short battery, clean app" not "great product").
@@ -194,7 +194,7 @@ def create_final_info_config() -> SearchConfig:
             "product": "product"
         },
         
-        max_searches=5
+        max_searches=4
     )
 
 
@@ -269,21 +269,20 @@ def create_final_info_graph():
     graph_builder = StateGraph(FinalInfoState)
     tool_node_research = tools_setup.tool_node()
 
-    graph_builder.add_node("tool_node_research", tool_node_research)
-    graph_builder.add_node("chatbot_research", chatbot_research_with_pattern)
-    graph_builder.add_node("convert_to_product_full", convert_to_product_full)
+    graph_builder.add_node("tool_node_final_info", tool_node_research)
+    graph_builder.add_node("final_info_chatbot", chatbot_research_with_pattern)
+    graph_builder.add_node("format_final_info", convert_to_product_full)
     graph_builder.add_node("print_node", print_node)
 
-    graph_builder.add_edge(START, "chatbot_research")
+    graph_builder.add_edge(START, "final_info_chatbot")
 
     graph_builder.add_conditional_edges(
-        "chatbot_research",
+        "final_info_chatbot",
         route_tools,
-        {"tools": "tool_node_research", END: "convert_to_product_full"},
+        {"tools": "tool_node_final_info", END: "format_final_info"},
     )
-    graph_builder.add_edge("tool_node_research", "chatbot_research")
-    graph_builder.add_edge("convert_to_product_full", "print_node")
-    graph_builder.add_edge("print_node", END)
+    graph_builder.add_edge("tool_node_final_info", "final_info_chatbot")
+    graph_builder.add_edge("format_final_info", END)
 
     return graph_builder.compile()
 

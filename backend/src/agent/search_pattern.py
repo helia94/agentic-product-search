@@ -258,7 +258,7 @@ def create_product_research_config() -> SearchConfig:
         Your task is to evaluate each product based on these criteria:
 
         - Write surgical search queries to evaluate the product based on the criteria.
-        - Use a MAX of 5 searches per product, ideally fewer. You already used {len_ai_queries} searches.
+        - Use a MAX of 3 searches per product, ideally fewer. You already used {len_ai_queries} searches.
         - START with obvious facts from seller pages (only if objective).
         - MOVE QUICKLY into digging for real-world evidence: reviews, Reddit threads, forums, expert opinions.
         - COMPARE products when possible, make judgments.
@@ -314,7 +314,7 @@ def create_product_research_config() -> SearchConfig:
             "criteria": "criteria"
         },
         
-        max_searches=5
+        max_searches=3
     )
 
 

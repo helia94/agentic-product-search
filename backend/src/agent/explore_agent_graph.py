@@ -219,18 +219,50 @@ def format_products(state: State):
     }
 
 def call_product_research_tool(state: State):
+    from langchain_core.runnables import RunnableWithFallbacks, RunnableLambda
+    
     crit = state.get("criteria", [])
     inputs = [{"product": p, "criteria": crit} for p in state.get("products", [])]
 
-    state_list = research_graph_with_pattern.batch(inputs, concurrency=len(inputs))
-    eval_results = [ s.get("final_output") for s in state_list]
+    # Create fallback that returns error state instead of failing
+    def error_fallback(input_data):
+        return {
+            "final_output": f"Error: Unable to evaluate {input_data.get('product', {}).get('name', 'Unknown')} after retries",
+            "product": input_data.get("product", {}),
+            "criteria": input_data.get("criteria", [])
+        }
+
+    # Create resilient graph with retry and fallbacks
+    resilient_graph = research_graph_with_pattern.with_retry(
+        retry_if_exception_type=(Exception,),
+        wait_exponential_jitter=True,
+        stop_after_attempt=2
+    )
+
+    # Add fallback to prevent individual failures from killing the batch
+    graph_with_fallback = RunnableWithFallbacks(
+        runnable=resilient_graph,
+        fallbacks=[RunnableLambda(error_fallback)]
+    )
+
+    # Execute single batch operation with concurrency - fallbacks handle individual failures
+    try:
+        state_list = graph_with_fallback.batch(inputs, concurrency=len(inputs))
+    except Exception as e:
+        print(f"Critical batch failure: {str(e)}")
+        # Create error states for all products if complete failure
+        state_list = [error_fallback(inp) for inp in inputs]
+
+    eval_results = [s.get("final_output") for s in state_list]
     results = []
     for product, eval_result in zip(state.get("products", []), eval_results):
         if isinstance(eval_result, str):
             results.append({
                 "product_id": product.get("id", "Unknown Product"),
-                "evaluation": eval_result
+                "evaluation": eval_result,
+                "status": "error" if eval_result.startswith("Error:") else "success"
             })
+    
     return {"research_results": results}
 
 
@@ -242,19 +274,19 @@ graph_builder = StateGraph(State)
 # Use new tool orchestration
 tool_node_explore = tools_setup.tool_node()
 
-graph_builder.add_node("tools", tool_node_explore)  # Renamed to match router expectation
+graph_builder.add_node("tools_explore", tool_node_explore)  # Renamed to match router expectation
 graph_builder.add_node("chatbot_explore", chatbot_explore)
-graph_builder.add_node("format_products", format_products)
+graph_builder.add_node("format_result_explore", format_products)
 graph_builder.add_node("call_product_research_tool", call_product_research_tool)
 
 graph_builder.add_edge(START, "chatbot_explore")
 graph_builder.add_conditional_edges(
     "chatbot_explore",
     route_tools,
-    {"tools": "tools", END: "format_products"},
+    {"tools": "tools_explore", END: "format_result_explore"},
 )
-graph_builder.add_edge("tools", "chatbot_explore")
-graph_builder.add_edge("format_products", "call_product_research_tool")
+graph_builder.add_edge("tools_explore", "chatbot_explore")
+graph_builder.add_edge("format_result_explore", "call_product_research_tool")
 graph_builder.add_edge("call_product_research_tool", END)
 
 

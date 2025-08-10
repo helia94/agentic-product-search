@@ -600,10 +600,10 @@ graph = builder.compile(name="product-search-agent", checkpointer=checkpointer)
 if __name__ == "__main__":
     # Test the graph with a sample state
     initial_state = OverallState(
-        user_query="Find the best smart home devices",
-        max_explore_products=3,
-        max_research_products=1,
-        max_explore_queries=1,
+        user_query="sleep tracking device with app",
+        max_explore_products=2,
+        max_research_products=2,
+        max_explore_queries=2,
     )
 
     config = {"configurable": {"thread_id": "some_id"}}
