@@ -17,6 +17,7 @@ from agent.query_processing import (
 from agent.query_generation import query_generator
 from agent.product_orchestration import call_product_search_graph, complete_product_info
 from agent.result_processing import save_results_to_disk, select_final_products
+from agent.html_generation import generate_html_results
 from agent.configuration import Configuration
 
 
@@ -35,6 +36,7 @@ builder.add_node("call_product_search_graph", call_product_search_graph)
 builder.add_node("complete_product_info", complete_product_info)
 builder.add_node("select_final_products", select_final_products)
 builder.add_node("save_results_to_disk", save_results_to_disk)
+builder.add_node("generate_html_results", generate_html_results)
 
 
 # Set the entrypoint as `planner`
@@ -55,7 +57,8 @@ builder.add_edge("query_generator", "call_product_search_graph")
 builder.add_edge("call_product_search_graph", "select_final_products")
 builder.add_edge("select_final_products", "complete_product_info")
 builder.add_edge("complete_product_info", "save_results_to_disk")
-builder.add_edge("save_results_to_disk", END)
+builder.add_edge("save_results_to_disk", "generate_html_results")
+builder.add_edge("generate_html_results", END)
 
 
 # Create persistent SQLite checkpointer that survives process restarts
