@@ -74,20 +74,20 @@ def create_final_info_config() -> SearchConfig:
         </SYSTEM>
 
         <INSTRUCTIONS>
-        Extract key product information from the search results:
-        "USP": "One-sentence unique selling proposition.",
-        "use_case": "Primary context or user segment.",
-        "country": "Design and manufacturing origin (e.g., 'Designed in FI, made in CN').",
-        "year": "Release year (YYYY).",
-        "review_summary": "Keyword-style user review highlights; no fluff.",
-        "rating": "Score plus source (e.g., '4.5/5 on Amazon').",
-        "reviews_count": "Exact review count; no ranges.",
-        "image_url": "1–3 image URLs, prefer official/reputable.",
-        "product_url": "Retailer link for the specified country; note if unavailable."
-         any other nuance interesting info you found nothing generic
+        Extract ALL product information from the search results:
+        "USP": "Complete unique selling proposition with all details and context found.",
+        "use_case": "ALL contexts and user segments mentioned with complete details.",
+        "country": "Complete design and manufacturing information found.",
+        "year": "Release year with any additional timeline information found.",
+        "review_summary": "ALL user review details found - preserve complete feedback, specific issues, positive points, context.",
+        "rating": "ALL rating information found from all sources with complete context.",
+        "reviews_count": "ALL review count information from all sources.",
+        "image_url": "ALL image URLs found, preserve all sources.",
+        "product_url": "ALL retailer links and purchasing information found."
+        ANY other information found - preserve everything.
 
-        Focus on factual data, avoid marketing fluff.
-        Return insights as a list of strings.
+        Preserve ALL factual data found, maintain complete context and details.
+        Return comprehensive insights preserving ALL information as complete detailed strings.
         </INSTRUCTIONS>
 
         <INPUT>
@@ -121,11 +121,11 @@ def create_final_info_config() -> SearchConfig:
 
         <CONSTRAINTS>
         {search_limit_text}
-        - Be concise, avoid fluff. Use info-dense, direct language.
+        - Preserve ALL details found. Use comprehensive, information-dense language.
         - You can make UP TO {concurrent_searches} search tool calls in parallel for faster research
-        - Review summaries = keyword-only, no generic opinions (e.g., say "short battery, clean app" not "great product").
-        - Image URLs: 1–3, from official or reputable retailers.
-        - Product URL must be live and specific to given country; if not available, include original URL + warning.
+        - Review summaries = preserve COMPLETE user feedback, specific experiences, detailed issues and benefits mentioned.
+        - Image URLs: find ALL available URLs from official and reputable sources.
+        - Product URL must include ALL purchasing options found with complete details.
         - Stop and return empty if product model is unclear.
         - DO NOT search for information you already have in tool_saved_info or in product info input. check all we have first before writing queries.
         - DO NOT repeat queries in ai_queries.
@@ -173,30 +173,29 @@ def create_final_info_config() -> SearchConfig:
         </SYSTEM>
 
         <INSTRUCTIONS>
-        Create a fully completed product information json using all gathered information.
+        Create a fully completed product information json using ALL gathered information.
         YOU HAVE TO RETURN A VALID JSON.
-        Put all the gathered information into the appropriate fields.
-        DO NOT add any extra fluff or jargon this is not a report.
-        It should make decision making easier and more informative. 
-        This is for the buyer not for the brands.
+        Put ALL the gathered information into the appropriate fields - preserve everything found.
+        Include ALL factual details found - this comprehensive information helps buyers make informed decisions.
+        This is for the buyer - provide complete, detailed information.
 
-        FILL all remaining json fields:
+        FILL all remaining json fields with COMPLETE information:
         "id": "Internal unique ID for tracking/retrieval. Inside product info.",
-        "name": "Fully qualified product name incl. model/specs. Inside product info.",
-        "criteria": "Dict of {{criterion: brief value/notes}}. Inside product info under evaluation.",
-        "USP": "One-line unique advantage. Inside product info or tool_saved_info.",
-        "use_case": "Primary intended user/usage. Inside product info or tool_saved_info.",
-        "price": "Exact numeric price (no ranges). Inside product info.",
-        "country": "Design and manufacture line (e.g., 'Designed in X, made in Y'). Inside tool_saved_info.",
-        "year": "Release year (YYYY). Inside tool_saved_info.",
-        "review_summary": "Comma-separated review keywords (no fluff). Inside tool_saved_info or product.",
-        "rating": "Score + source (e.g., '4.6/5 on Amazon').  Inside tool_saved_info.",
-        "reviews_count": "Exact review count at the source.  Inside tool_saved_info.",
-        "image_url": "1–3 image URLs (official/reputable).  Inside tool_saved_info.",
-        "product_url": "Retailer URL for target country; otherwise original with warning. Inside tool_saved_info."
+        "name": "Complete product name with ALL specs/details found. Inside product info.",
+        "criteria": "Dict of {{criterion: COMPLETE detailed value/notes with ALL information found}}. Inside product info under evaluation.",
+        "USP": "COMPLETE unique advantage description with ALL details. Inside product info or tool_saved_info.",
+        "use_case": "ALL intended users/usages mentioned with complete context. Inside product info or tool_saved_info.",
+        "price": "ALL pricing information found (include ranges, different sources). Inside product info.",
+        "country": "COMPLETE design and manufacture information. Inside tool_saved_info.",
+        "year": "Release year with ANY additional timeline details. Inside tool_saved_info.",
+        "review_summary": "COMPLETE user review details - preserve ALL feedback, issues, benefits, context. Inside tool_saved_info or product.",
+        "rating": "ALL ratings from ALL sources with complete context. Inside tool_saved_info.",
+        "reviews_count": "ALL review counts from ALL sources. Inside tool_saved_info.",
+        "image_url": "ALL image URLs found from ALL sources. Inside tool_saved_info.",
+        "product_url": "ALL retailer URLs and purchasing information found. Inside tool_saved_info."
         
         If any field cannot be determined from the research, use "unknown".
-        Return valid JSON format for ProductFull.
+        Return valid JSON format for ProductFull with COMPLETE information preservation.
         </INSTRUCTIONS>
         <EXAMPLES>
         

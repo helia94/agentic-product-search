@@ -104,11 +104,12 @@ def create_product_explore_config() -> SearchConfig:
         <INSTRUCTIONS>
         Analyze the search results and extract specific products mentioned:
         - Look for specific product models, not just categories or brands
-        - Extract key details: brand, model name, key features, pricing if available
+        - Extract ALL details found: brand, model name, features, pricing, specifications, user feedback, availability, etc.
         - Focus on products that match the search query: {query}
-        - Ignore vague or general information
+        - Preserve ALL factual information found, including specific numbers, measurements, prices, technical details
         
-        Return your findings as a list of insights about specific products found.
+        Return your findings as a comprehensive list preserving ALL specific information about each product found.
+        Include direct quotes, exact figures, and detailed specifications exactly as found in the source.
         </INSTRUCTIONS>
         
         <INPUT>
@@ -160,9 +161,9 @@ def create_product_explore_config() -> SearchConfig:
             {{
                 "id": "product-model-name",
                 "name": "Brand Product Model",
-                "USP": "Key selling point",
-                "use_case": "Primary use case",
-                "other_info": "Price, battery, specs"
+                "USP": "Complete unique selling proposition with all details found",
+                "use_case": "Complete use case description with all contexts mentioned",
+                "other_info": "ALL information found: prices, specifications, battery life, dimensions, user feedback, availability, technical details, ratings, etc. - preserve everything"
             }}
         ]
         
@@ -222,7 +223,9 @@ def format_products(state: State):
     
     result = llm_with_structured_output.invoke(f"""
     Extract and format the product list from this text into the required structure.
-    Deduplicate and keep maximum {max_products} products based on relevance to query: {state.get("query", "")}
+    PRESERVE ALL INFORMATION - do not summarize, shorten, or lose any details.
+    Keep maximum {max_products} products based on relevance to query: {state.get("query", "")}
+    For each product, include ALL available information in the appropriate fields.
     
     Text to process:
     {final_output}
