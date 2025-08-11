@@ -250,7 +250,7 @@ def chatbot_research_with_pattern(state: FinalInfoState):
     return execute_search_pattern_flexible(
         state=state,
         llm=llm_gemini,
-        llm_with_tools=tools_setup.bind_tools_to_llm(llm_gemini, parallel_tool_calls=True),
+        llm_with_tools=tools_setup.bind_tools_to_llm(llm_gemini),
         config=config
     )
 

@@ -8,14 +8,18 @@ from typing import Dict, List, Any
 from langchain_core.messages import ToolMessage
 from langchain_core.tools import BaseTool
 from langgraph.graph import END
+from langgraph.prebuilt import ToolNode
 import json
 
 
 def create_tool_node(tools: List[BaseTool], input_field: str = "ai_queries", output_field: str = "tool_last_output"):
-    """Create a tool execution node"""
-    tools_by_name = {tool.name: tool for tool in tools}
+    """Create a tool execution node using LangGraph's built-in ToolNode for parallel execution"""
     
-    def tool_node(state: Dict[str, Any]) -> Dict[str, Any]:
+    # Use LangGraph's built-in ToolNode which automatically executes tools in parallel
+    langgraph_tool_node = ToolNode(tools)
+    
+    def tool_node_wrapper(state: Dict[str, Any]) -> Dict[str, Any]:
+        """Wrapper to adapt LangGraph ToolNode to our state structure"""
         messages = state.get(input_field, [])
         if not messages:
             return {output_field: []}
@@ -24,19 +28,25 @@ def create_tool_node(tools: List[BaseTool], input_field: str = "ai_queries", out
         if not hasattr(last_message, 'tool_calls') or not last_message.tool_calls:
             return {output_field: []}
         
+        # Log parallel execution info
+        if len(last_message.tool_calls) > 1:
+            print(f"LangGraph ToolNode executing {len(last_message.tool_calls)} tool calls in parallel")
+        
+        # Create input in the format expected by ToolNode (MessagesState)
+        tool_node_input = {"messages": [last_message]}
+        
+        # Execute using LangGraph's built-in parallel tool execution
+        result = langgraph_tool_node.invoke(tool_node_input)
+        
+        # Extract the tool messages from the result
         tool_messages = []
-        for tool_call in last_message.tool_calls:
-            tool_result = tools_by_name[tool_call["name"]].invoke(tool_call["args"])
-            tool_messages.append(
-                ToolMessage(
-                    content=json.dumps(tool_result),
-                    name=tool_call["name"],
-                    tool_call_id=tool_call["id"],
-                )
-            )
+        for msg in result.get("messages", []):
+            if hasattr(msg, 'type') and msg.type == 'tool':
+                tool_messages.append(msg)
+        
         return {output_field: tool_messages}
     
-    return tool_node
+    return tool_node_wrapper
 
 
 def create_tool_router(input_field: str = "ai_queries", tool_node_name: str = "tools"):
