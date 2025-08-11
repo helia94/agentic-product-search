@@ -6,6 +6,7 @@ from pydantic import BaseModel, Field
 
 from agent.state_V2 import OverallState
 from agent.llm_setup import llm_gemini
+from agent.search_limits import get_max_research_products
 
 
 def save_results_to_disk(state: OverallState) -> OverallState:
@@ -91,7 +92,7 @@ def select_final_products(state: OverallState) -> OverallState:
         {products_string}
        """
     
-    max_products_to_show = state.get("max_research_products", 5)
+    max_products_to_show = get_max_research_products()
     instructions = instructions.format(
         query=query_str,
         max_products_to_show=max_products_to_show,

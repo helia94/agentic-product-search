@@ -3,6 +3,7 @@ from langchain_core.runnables import RunnableConfig
 from agent.state_V2 import OverallState, Queries
 from agent.configuration import Configuration
 from agent.llm_setup import llm_gemini
+from agent.search_limits import get_max_explore_queries
 
 
 def query_generator(state: OverallState, config: RunnableConfig) -> OverallState:
@@ -67,7 +68,7 @@ def query_generator(state: OverallState, config: RunnableConfig) -> OverallState
         I want to buy {product} for {use_case}, and I have these criteria in mind: {criteria}. And these conditions: {conditions}. out put maximum of {max_explore_queries} queries.
     """
     
-    max_explore_queries=state.get("max_explore_queries", 10)
+    max_explore_queries = get_max_explore_queries()
     formatted_prompt = instructions.format(
         product=product,
         use_case=use_case,

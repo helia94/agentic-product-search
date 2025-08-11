@@ -19,7 +19,13 @@ from agent.product_orchestration import call_product_search_graph, complete_prod
 from agent.result_processing import save_results_to_disk, select_final_products
 from agent.html_generation import generate_html_results
 from agent.configuration import Configuration
-from agent.search_limits import configure_search_limits_from_main_graph, ComponentNames
+from agent.search_limits import (
+    configure_search_limits_from_main_graph, 
+    ComponentNames,
+    get_max_explore_products,
+    get_max_research_products, 
+    get_max_explore_queries
+)
 
 
 
@@ -86,13 +92,34 @@ def configure_search_limits_for_product_search():
     """
     Configure search limits for the product search workflow.
     Simple configuration with just three values - one per search pattern.
+    Also configures Tavily settings and product processing limits for each component.
     """
     configure_search_limits_from_main_graph(
         product_exploration=2,      # explore-agent-graph 
         product_research=3,         # research-with-pattern
-        final_product_info=8        # final-info-graph
+        final_product_info=8,       # final-info-graph
+        
+        # Product processing limits
+        max_explore_products=2,
+        max_research_products=2,
+        max_explore_queries=5,
+        
+        # Tavily configuration - customize these settings
+        exploration_tavily_max_results=3,
+        exploration_tavily_include_answer=False,
+        exploration_tavily_search_depth="basic",
+        
+        research_tavily_max_results=5,
+        research_tavily_include_answer=True,
+        research_tavily_search_depth="advanced",
+        
+        final_info_tavily_max_results=4,
+        final_info_tavily_include_answer=False,
+        final_info_tavily_search_depth="basic"
     )
     print("🎯 Search limits configured: explore=2, research=3, final=8")
+    print("📦 Product limits: explore=2 products, research=2 products, queries=5")
+    print("🔍 Tavily configured: exploration=3/basic, research=5/advanced, final=4/basic")
 
 
 def configure_aggressive_search_limits():
@@ -100,11 +127,31 @@ def configure_aggressive_search_limits():
     Configure more aggressive (faster) search limits for quick results.
     """
     configure_search_limits_from_main_graph(
-        product_exploration=2,
-        product_research=2, 
-        final_product_info=2
+        product_exploration=3,
+        product_research=3, 
+        final_product_info=6,
+        
+        # Aggressive product limits - fewer products for speed
+        max_explore_products=2,
+        max_research_products=1,
+        max_explore_queries=3,
+        
+        # Aggressive Tavily settings - fewer results, basic search
+        exploration_tavily_max_results=5,
+        exploration_tavily_include_answer=False,
+        exploration_tavily_search_depth="basic",
+        
+        research_tavily_max_results=10,
+        research_tavily_include_answer=True,
+        research_tavily_search_depth="basic",
+        
+        final_info_tavily_max_results=10,
+        final_info_tavily_include_answer=True,
+        final_info_tavily_search_depth="basic"
     )
     print("⚡ Aggressive search limits: explore=1, research=2, final=4")
+    print("📦 Aggressive product limits: explore=1 product, research=1 product, queries=3")
+    print("🔍 Aggressive Tavily: exploration=2/basic, research=3/basic, final=3/basic")
 
 
 def configure_thorough_search_limits():
@@ -113,10 +160,31 @@ def configure_thorough_search_limits():
     """
     configure_search_limits_from_main_graph(
         product_exploration=5,
-        product_research=8,
-        final_product_info=8
+        product_research=10,
+        final_product_info=10,
+        
+        # Thorough product limits - more products for comprehensive analysis
+        max_explore_queries=5,
+        max_explore_products=7,
+        max_research_products=2,
+        
+        
+        # Thorough Tavily settings - more results, advanced search
+        exploration_tavily_max_results=5,
+        exploration_tavily_include_answer=False,
+        exploration_tavily_search_depth="basic",
+        
+        research_tavily_max_results=20,
+        research_tavily_include_answer=True,
+        research_tavily_search_depth="advanced",
+        
+        final_info_tavily_max_results=10,
+        final_info_tavily_include_answer=True,
+        final_info_tavily_search_depth="advanced"
     )
-    print("🔍 Thorough search limits: explore=5, research=8, final=8")
+    print("🔍 Thorough search limits: explore=4, research=6, final=12")
+    print("📦 Thorough product limits: explore=4 products, research=4 products, queries=8")
+    print("🔍 Thorough Tavily: exploration=5/advanced, research=7/advanced, final=6/advanced")
 
 
 def initialize_graph_with_search_limits(search_mode: str = "default"):
@@ -155,12 +223,9 @@ if __name__ == "__main__":
     RESUME_FROM_NODE = "select_final_products"  # Node name to resume from
     THREAD_ID = "some_id"  # Keep consistent for checkpoint persistence
     
-    # Test the graph with a sample state
+    # Test the graph with a sample state - product limits now come from centralized config
     initial_state = OverallState(
-        user_query="sleep tracking device with app",
-        max_explore_products=2,
-        max_research_products=2,
-        max_explore_queries=5,
+        user_query="sleep tracking device with app"
     )
 
     config = {"configurable": {"thread_id": THREAD_ID}}

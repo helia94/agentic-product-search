@@ -41,15 +41,17 @@ import json
 
 from langchain_core.messages import ToolMessage
 from langchain.globals import set_debug, set_verbose
-from agent.basic_tools import llm_gemini, tavily
+from agent.basic_tools import llm_gemini
 from agent.tool_orchestrator import SimpleToolOrchestrator
 from agent.search_pattern import BaseSearchState, execute_search_pattern_flexible, SearchConfig
 from agent.search_limits import (
     get_search_limit, 
     generate_search_prompt_text, 
     is_search_limit_reached,
+    get_tavily_config,
     ComponentNames
 )
+from langchain_tavily import TavilySearch
 from agent.research_with_pattern import research_graph_with_pattern
 
 #set_debug(True)
@@ -74,8 +76,19 @@ class State(BaseSearchState):
     # tool_last_output: List[AIMessage]
     # final_output: str
 
-# Tool setup
-tools_setup = SimpleToolOrchestrator([tavily], "ai_queries", "tool_last_output")
+# Create Tavily instance with centralized configuration
+def create_exploration_tavily():
+    """Create Tavily instance for product exploration with centralized config"""
+    tavily_config = get_tavily_config(ComponentNames.PRODUCT_EXPLORATION)
+    return TavilySearch(
+        max_results=tavily_config.max_results,
+        include_answer=tavily_config.include_answer,
+        search_depth=tavily_config.search_depth
+    )
+
+# Tool setup with exploration-specific Tavily
+exploration_tavily = create_exploration_tavily()
+tools_setup = SimpleToolOrchestrator([exploration_tavily], "ai_queries", "tool_last_output")
 
 
 def create_product_explore_config() -> SearchConfig:

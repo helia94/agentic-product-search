@@ -17,9 +17,11 @@ from dotenv import load_dotenv
 load_dotenv()
 
 from agent.state_V2 import ProductSimple
-from agent.basic_tools import llm_gemini, tavily
+from agent.basic_tools import llm_gemini
 from agent.tool_orchestrator import SimpleToolOrchestrator
 from agent.search_pattern import BaseSearchState, execute_search_pattern_flexible, create_product_research_config
+from agent.search_limits import get_tavily_config, ComponentNames
+from langchain_tavily import TavilySearch
 
 from langchain.globals import set_debug
 set_debug(True)
@@ -39,8 +41,19 @@ class ProductResearchState(BaseSearchState):
     # tool_last_output: List[AIMessage]
     # final_output: str
 
-# Simple tool setup
-tools_setup = SimpleToolOrchestrator([tavily])
+# Create Tavily instance with centralized configuration
+def create_research_tavily():
+    """Create Tavily instance for product research with centralized config"""
+    tavily_config = get_tavily_config(ComponentNames.PRODUCT_RESEARCH)
+    return TavilySearch(
+        max_results=tavily_config.max_results,
+        include_answer=tavily_config.include_answer,
+        search_depth=tavily_config.search_depth
+    )
+
+# Tool setup with research-specific Tavily
+research_tavily = create_research_tavily()
+tools_setup = SimpleToolOrchestrator([research_tavily])
 
 
 def chatbot_research_with_pattern(state: ProductResearchState):

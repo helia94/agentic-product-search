@@ -19,15 +19,17 @@ load_dotenv()
 
 from langchain.globals import set_debug, set_verbose
 from agent.state_V2 import ProductFull
-from agent.basic_tools import llm_gemini, tavily
+from agent.basic_tools import llm_gemini
 from agent.tool_orchestrator import SimpleToolOrchestrator
 from agent.search_pattern import BaseSearchState, execute_search_pattern_flexible, SearchConfig
 from agent.search_limits import (
     get_search_limit, 
     generate_search_prompt_text, 
     is_search_limit_reached,
+    get_tavily_config,
     ComponentNames
 )
+from langchain_tavily import TavilySearch
 
 #set_debug(True)
 #set_verbose(True)
@@ -47,8 +49,19 @@ class FinalInfoState(BaseSearchState):
     # final_output: str
 
 
-# Simple tool setup
-tools_setup = SimpleToolOrchestrator([tavily])
+# Create Tavily instance with centralized configuration
+def create_final_info_tavily():
+    """Create Tavily instance for final product info with centralized config"""
+    tavily_config = get_tavily_config(ComponentNames.FINAL_PRODUCT_INFO)
+    return TavilySearch(
+        max_results=tavily_config.max_results,
+        include_answer=tavily_config.include_answer,
+        search_depth=tavily_config.search_depth
+    )
+
+# Tool setup with final-info-specific Tavily
+final_info_tavily = create_final_info_tavily()
+tools_setup = SimpleToolOrchestrator([final_info_tavily])
 
 
 def create_final_info_config() -> SearchConfig:

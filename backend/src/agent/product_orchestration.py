@@ -3,6 +3,7 @@ import json
 from agent.state_V2 import OverallState
 from agent.explore_agent_graph import graph_explore
 from agent.final_info_graph import final_info_graph
+from agent.search_limits import get_max_explore_products, get_max_research_products
 
 
 def call_product_search_graph(state: OverallState) -> OverallState:
@@ -21,8 +22,8 @@ def call_product_search_graph(state: OverallState) -> OverallState:
             "query": query_str,
             "queries": queries,
             "criteria": criteria,
-            "max_explore_products": state.get("max_explore_products", 15),
-            "max_research_products": state.get("max_research_products", 5),
+            "max_explore_products": get_max_explore_products(),
+            "max_research_products": get_max_research_products(),
         }
     )
 
