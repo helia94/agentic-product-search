@@ -52,7 +52,7 @@ tavily = TavilySearch(
 tools = [tavily]
 
 # Modification: tell the LLM which tools it can call  
-llm_with_tools = llm_gemini.bind_tools(tools)
+llm_with_tools = llm_gemini.bind_tools(tools, parallel_tool_calls=True)
 
 # Simple wrappers
 def BasicToolNode(tools, message_field_input, message_field_output):

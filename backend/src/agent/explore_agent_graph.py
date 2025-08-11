@@ -134,6 +134,7 @@ def create_product_explore_config() -> SearchConfig:
         - Don't repeat previous searches: {ai_queries}
         - Focus on finding purchasable, specific product models
         - Stop when you have enough products ({max_explore_products}) or no more queries
+        - You can make UP TO {concurrent_searches} search tool calls in parallel for faster research
         
         Use the search tool to find products or return nothing if done.
         </INSTRUCTIONS>

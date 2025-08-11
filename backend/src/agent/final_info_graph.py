@@ -122,6 +122,7 @@ def create_final_info_config() -> SearchConfig:
         <CONSTRAINTS>
         {search_limit_text}
         - Be concise, avoid fluff. Use info-dense, direct language.
+        - You can make UP TO {concurrent_searches} search tool calls in parallel for faster research
         - Review summaries = keyword-only, no generic opinions (e.g., say "short battery, clean app" not "great product").
         - Image URLs: 1–3, from official or reputable retailers.
         - Product URL must be live and specific to given country; if not available, include original URL + warning.
@@ -134,6 +135,7 @@ def create_final_info_config() -> SearchConfig:
         - DO NOT BUNDLE unrelated key words in search like "manufacture country, user ratings, review count, review summaries, official product images
         - Either search for each missing field individually, or use general query like honest reviews of X
         - image_url is very important always include it
+        - You can make UP TO {concurrent_searches} search tool calls in parallel for faster research
         </CONSTRAINTS>
 
         <INPUT FORMAT>
@@ -248,7 +250,7 @@ def chatbot_research_with_pattern(state: FinalInfoState):
     return execute_search_pattern_flexible(
         state=state,
         llm=llm_gemini,
-        llm_with_tools=tools_setup.bind_tools_to_llm(llm_gemini),
+        llm_with_tools=tools_setup.bind_tools_to_llm(llm_gemini, parallel_tool_calls=True),
         config=config
     )
 

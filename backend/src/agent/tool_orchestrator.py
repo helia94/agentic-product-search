@@ -62,7 +62,7 @@ class SimpleToolOrchestrator:
         self.output_field = output_field
     
     def bind_tools_to_llm(self, llm):
-        return llm.bind_tools(self.tools)
+        return llm.bind_tools(self.tools, parallel_tool_calls=True)
     
     def tool_node(self):
         return create_tool_node(self.tools, self.input_field, self.output_field)

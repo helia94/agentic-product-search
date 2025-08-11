@@ -16,6 +16,7 @@ from agent.search_limits import (
     get_search_limit, 
     generate_search_prompt_text, 
     is_search_limit_reached,
+    get_concurrent_searches,
     ComponentNames
 )
 
@@ -27,6 +28,7 @@ class BaseSearchState(TypedDict):
     tool_saved_info: Annotated[List[str], add_messages]
     tool_last_output: List[AIMessage]
     final_output: str
+    last_tool_call_count: int  # Track how many tool calls were made in the last step
 
 
 class SearchConfig(BaseModel):
@@ -86,23 +88,47 @@ def step1_analyze_last_tool_call(state: Dict[str, Any],
                                 llm,
                                 config: SearchConfig) -> List[str]:
     """
-    Step 1: Look at last tool call - your exact logic with configurable state mapping
+    Step 1: Look at last tool calls - handles multiple parallel tool call outputs using actual count
     """
     
     tool_last_output_list = state.get("tool_last_output", [])
-    last_tool_call_output = tool_last_output_list[-1] if tool_last_output_list else None
     ai_queries = state.get("ai_queries", [])
+    last_tool_call_count = state.get("last_tool_call_count", 1)  # Default to 1 if not set
     
-    if not last_tool_call_output:
-        print("no last tool call output, skipping analysis")
+    if not tool_last_output_list:
+        print("no last tool call outputs, skipping analysis")
         return []
         
-    print("analyzing last tool call output")
+    # Get the exact number of tool call outputs from the last step
+    recent_outputs = tool_last_output_list[-last_tool_call_count:] if len(tool_last_output_list) >= last_tool_call_count else tool_last_output_list
     
-    # Your exact tool call context
+    print(f"analyzing {len(recent_outputs)} recent tool call outputs from last step")
+    
+    # Build context from multiple tool call results
+    tool_arguments = []
+    tool_outputs = []
+    
+    # Get the most recent AI query(s) that generated these tool calls
+    if ai_queries:
+        recent_ai_query = ai_queries[-1]
+        if hasattr(recent_ai_query, 'tool_calls') and recent_ai_query.tool_calls:
+            # Handle the actual number of tool calls that were made (not assume concurrent_count)
+            actual_tool_calls = recent_ai_query.tool_calls[:last_tool_call_count]
+            for i, tool_call in enumerate(actual_tool_calls):
+                query = tool_call.get("args", {}).get("query", "")
+                tool_arguments.append(f"Search {i+1}: {query}")
+        else:
+            tool_arguments.append("No tool call arguments found")
+    
+    # Process multiple outputs
+    for i, output in enumerate(recent_outputs):
+        content = output.content if hasattr(output, 'content') else str(output)
+        tool_outputs.append(f"Result {i+1}: {content}")
+    
+    # Your exact tool call context but for multiple calls
     tool_context = {
-        "last_tool_call_arguments": json.dumps(ai_queries[-1].tool_calls[0].get("args", {}).get("query", "")) if ai_queries else "{}",
-        "last_tool_call_output": last_tool_call_output.content if hasattr(last_tool_call_output, 'content') else str(last_tool_call_output),
+        "last_tool_call_arguments": json.dumps(tool_arguments),
+        "last_tool_call_output": " | ".join(tool_outputs),
     }
     
     # Apply configurable state mapping
@@ -139,12 +165,16 @@ def step2_generate_search_or_done(state: Dict[str, Any],
         print(f"Skipping search query generation, reached maximum number of queries ({max_limit}) for {config.component_name}")
         return None, serializable_tool_info
     
-    # Your exact search context with dynamic search limit text
+    # Get concurrent search configuration
+    concurrent_count = get_concurrent_searches(config.component_name)
+    
+    # Your exact search context with dynamic search limit text and concurrent search info
     search_context = {
         "tool_saved_info": json.dumps(serializable_tool_info + result_tool_call_analysis),
         "ai_queries": json.dumps([msg.tool_calls[0].get("args", {}).get("query", "") for msg in ai_queries]),
         "len_ai_queries": len(ai_queries),
         "search_limit_text": generate_search_prompt_text(config.component_name, len(ai_queries)),
+        "concurrent_searches": concurrent_count,
     }
     
     # Apply configurable state mapping
@@ -202,10 +232,12 @@ def execute_search_pattern_flexible(state: Dict[str, Any],
     
     # Step 3: Return search action or final output
     if result_search_query and result_search_query.tool_calls:
-        print("we have a search query to run")
+        actual_tool_call_count = len(result_search_query.tool_calls)
+        print(f"we have {actual_tool_call_count} search queries to run in parallel")
         return {
             "ai_queries": [result_search_query],
-            "tool_saved_info": result_tool_call_analysis
+            "tool_saved_info": result_tool_call_analysis,
+            "last_tool_call_count": actual_tool_call_count
         }
     else:
         final_output = step3_format_final_output(
@@ -215,120 +247,8 @@ def execute_search_pattern_flexible(state: Dict[str, Any],
         return {
             "final_output": final_output,
             "ai_queries": [AIMessage(content="no more searches")],
+            "last_tool_call_count": 0  # No tool calls made in this step
         }
-
-
-# Pre-configured examples for different domains
-def create_product_research_config() -> SearchConfig:
-    """Your exact product research configuration"""
-    
-    return SearchConfig(
-        analyze_prompt="""
-        <SYSTEM>
-        You are a hyper-skeptical, detail-obsessed research expert with a nose for digging up truth in a swamp of marketing hype. 
-        You question everything, detect promotional fluff instantly, and obsess over the credibility of every source.
-
-        You:
-        - ANALYZE the last tool call to a search engine, take useful info and ignore the junk.
-        - LOVE user reviews, expert breakdowns (especially on YouTube), and deep dives—not marketing blurbs.
-        - NEVER trust subjective claims from sellers or retailers—only take objective data (e.g., dimensions, price).
-        </SYSTEM>
-
-        <INSTRUCTIONS>
-        Your task is to read product information and criteria, and analyze the last tool call output to extract useful information.:
-
-        - Identify key details about the product's performance, features, limitations, especially related to the list of criteria we are looking at.
-        - Cross-reference findings with user reviews and expert opinions to validate claims.
-        - Highlight any discrepancies or uncertainties in the information gathered.
-        - WRITE like you're texting a sharp best friend: quick, blunt, clear.
-
-        Return your output using this format:
-            List[str]
-        </INSTRUCTIONS>
-
-        <INPUT>
-        product: {product}
-        criteria: {criteria}
-        last_tool_call_arguments: {last_tool_call_arguments}
-        last_tool_call_output: {last_tool_call_output}
-        </INPUT>
-        """,
-        
-        search_prompt="""
-        <SYSTEM>
-        You are a hyper-skeptical, detail-obsessed research expert with a nose for digging up truth in a swamp of marketing hype. 
-        You question everything, detect promotional fluff instantly, and obsess over the credibility of every source.
-
-        You:
-        - ANALYZE every last tool call before doing anything—if it's junk, you IGNORE it.
-        - LOVE user reviews, expert breakdowns (especially on YouTube), and deep dives—not marketing blurbs.
-        - NEVER trust subjective claims from sellers or retailers—only take objective data (e.g., dimensions, price).
-        - FORMULATE surgical search queries to extract real-life performance, specific problems, and edge-case details.
-        - DON'T stop at vague answers—search until the truth is nailed down or marked "unknown."
-        </SYSTEM>
-
-        <INSTRUCTIONS>
-        Your task is to evaluate each product based on these criteria:
-
-        - Write surgical search queries to evaluate the product based on the criteria.
-        {search_limit_text}
-        - START with obvious facts from seller pages (only if objective).
-        - MOVE QUICKLY into digging for real-world evidence: reviews, Reddit threads, forums, expert opinions.
-        - COMPARE products when possible, make judgments.
-        - BE EXPLICIT about uncertainty—use "unknown" if unclear.
-        - DO NOTHING if product model is missing or ambiguous—return empty.
-        - DO NOT search for the information you already have, only search for the information you need.
-        - DO NOT repeat queries in ai_queries.
-        - New search query should be significantly different from the last ones in ai_queries.
-        - DO NOT use include_domains field of the search tool.
-
-        your output should be a searching tool call or nothing if you have enough information already.
-        </INSTRUCTIONS>
-
-        <INPUT>
-        product: {product}
-        criteria: {criteria}
-        tool_saved_info: {tool_saved_info}
-        ai_queries: {ai_queries}
-        
-        </INPUT>
-        """,
-        
-        format_prompt="""
-        <SYSTEM>
-        You are a hyper-skeptical, detail-obsessed research expert with a nose for digging up truth in a swamp of marketing hype. 
-        You question everything, detect promotional fluff instantly, and obsess over the credibility of every source.
-
-        You:
-        - LOVE user reviews, expert breakdowns (especially on YouTube), and deep dives—not marketing blurbs.
-        - NEVER trust subjective claims from sellers or retailers—only take objective data (e.g., dimensions, price).
-        - WRITE like you're texting a sharp best friend: quick, blunt, clear.
-        </SYSTEM>
-
-        <INSTRUCTIONS>
-        Your task is to evaluate each product based on fixed criteria:
-
-        - Look at all the facts we have gathered by searching the web and formulate them to criteria assessments.
-        - Try to use all the information you have in tool_saved_info we tried hard in gathering it, try to fit into the criteria, but do not invent anything.
-        - If answer to a criteria is not found, return "unknown" for that criteria.
-
-        Return your output as a clear assessment for each criterion.
-        </INSTRUCTIONS>
-
-        <INPUT>
-        product: {product}
-        criteria: {criteria}
-        tool_saved_info: {tool_saved_info}
-        </INPUT>
-        """,
-        
-        state_field_mapping={
-            "product": "product",
-            "criteria": "criteria"
-        },
-        
-        component_name=ComponentNames.PRODUCT_RESEARCH
-    )
 
 
 def create_market_research_config() -> SearchConfig:

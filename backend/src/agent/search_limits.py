@@ -29,6 +29,11 @@ class SearchLimitsConfig(BaseModel):
     max_research_products: int = Field(default=2, description="Maximum products to research in detail")
     max_explore_queries: int = Field(default=5, description="Maximum exploration queries to generate")
     
+    # Concurrent tool calls configuration
+    product_exploration_concurrent_searches: int = Field(default=2, description="Number of parallel searches per step in exploration")
+    product_research_concurrent_searches: int = Field(default=3, description="Number of parallel searches per step in research")
+    final_product_info_concurrent_searches: int = Field(default=2, description="Number of parallel searches per step in final info")
+    
     # Tavily configuration per component
     product_exploration_tavily: TavilyConfig = Field(default_factory=lambda: TavilyConfig(max_results=3, include_answer=False, search_depth="basic"))
     product_research_tavily: TavilyConfig = Field(default_factory=lambda: TavilyConfig(max_results=5, include_answer=True, search_depth="advanced")) 
@@ -72,6 +77,16 @@ class SearchLimitsConfig(BaseModel):
         }
         
         return tavily_configs.get(component_name, TavilyConfig())  # Default fallback
+    
+    def get_concurrent_searches(self, component_name: str) -> int:
+        """Get concurrent search count for a specific component"""
+        concurrent_configs = {
+            "product_exploration": self.product_exploration_concurrent_searches,
+            "product_research": self.product_research_concurrent_searches,
+            "final_product_info": self.final_product_info_concurrent_searches,
+        }
+        
+        return concurrent_configs.get(component_name, 3)  # Default fallback
 
 
 # Global instance - single source of truth
@@ -119,6 +134,11 @@ def get_max_explore_queries() -> int:
     return SEARCH_LIMITS.max_explore_queries
 
 
+def get_concurrent_searches(component_name: str) -> int:
+    """Get concurrent searches count for a component"""
+    return SEARCH_LIMITS.get_concurrent_searches(component_name)
+
+
 def configure_search_limits_from_main_graph(
     product_exploration: int = None,
     product_research: int = None, 
@@ -127,6 +147,10 @@ def configure_search_limits_from_main_graph(
     max_explore_products: int = None,
     max_research_products: int = None,
     max_explore_queries: int = None,
+    # Concurrent search configuration
+    exploration_concurrent_searches: int = None,
+    research_concurrent_searches: int = None,
+    final_info_concurrent_searches: int = None,
     # Tavily configuration
     exploration_tavily_max_results: int = None,
     exploration_tavily_include_answer: bool = None,
@@ -173,6 +197,14 @@ def configure_search_limits_from_main_graph(
         updates['max_research_products'] = max_research_products
     if max_explore_queries is not None:
         updates['max_explore_queries'] = max_explore_queries
+    
+    # Update concurrent search configuration
+    if exploration_concurrent_searches is not None:
+        updates['product_exploration_concurrent_searches'] = exploration_concurrent_searches
+    if research_concurrent_searches is not None:
+        updates['product_research_concurrent_searches'] = research_concurrent_searches
+    if final_info_concurrent_searches is not None:
+        updates['final_product_info_concurrent_searches'] = final_info_concurrent_searches
     
     # Update Tavily configurations
     if any([exploration_tavily_max_results is not None, exploration_tavily_include_answer is not None, exploration_tavily_search_depth is not None]):
