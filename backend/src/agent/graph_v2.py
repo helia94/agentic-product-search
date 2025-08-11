@@ -129,7 +129,7 @@ def configure_aggressive_search_limits():
     configure_search_limits_from_main_graph(
         product_exploration=3,
         product_research=3, 
-        final_product_info=6,
+        final_product_info=3,
         
         # Aggressive product limits - fewer products for speed
         max_explore_products=2,
@@ -141,11 +141,11 @@ def configure_aggressive_search_limits():
         exploration_tavily_include_answer=False,
         exploration_tavily_search_depth="basic",
         
-        research_tavily_max_results=10,
+        research_tavily_max_results=5,
         research_tavily_include_answer=True,
         research_tavily_search_depth="basic",
         
-        final_info_tavily_max_results=10,
+        final_info_tavily_max_results=5,
         final_info_tavily_include_answer=True,
         final_info_tavily_search_depth="basic"
     )
@@ -215,8 +215,8 @@ if __name__ == "__main__":
     print("🔧 Search limits configured and ready...")
     
     # Optionally override with different configuration:
-    # configure_aggressive_search_limits()  # For faster execution
-    configure_thorough_search_limits()    # For comprehensive research
+    configure_aggressive_search_limits()  # For faster execution
+    # configure_thorough_search_limits()    # For comprehensive research
     
     # Configuration options - change these to control execution
     RUN_FROM_BEGINNING = True  # Set to True to run from start, False to resume
