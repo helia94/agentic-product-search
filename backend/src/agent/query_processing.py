@@ -55,6 +55,8 @@ def enrich_query(state: OverallState, config: RunnableConfig) -> OverallState:
 
         Use cases and customer segments list: One product category serves many customer segments and many use cases, if not completely clear by user query list possible segments max 4 so the user can choose.
 
+        offer usecases only if you think is really unclear and customer segments need different options. Do not be unreasonable/annoying in your suggestions. only if it helps the search significantly. 
+
         Example query "best noise cancelling device"
         Relevant search time: 2 years
         Sources hint: reddit, wired, youtube,

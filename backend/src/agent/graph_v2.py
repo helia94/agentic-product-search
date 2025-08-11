@@ -176,9 +176,9 @@ def configure_thorough_search_limits():
         final_product_info=10,
         
         # Thorough product limits - more products for comprehensive analysis
-        max_explore_queries=5,
-        max_explore_products=7,
-        max_research_products=2,
+        max_explore_queries=7,
+        max_explore_products=10,
+        max_research_products=5,
         
         # Thorough concurrent searches - moderate parallel calls for accuracy
         exploration_concurrent_searches=3,
@@ -232,8 +232,8 @@ if __name__ == "__main__":
     print("🔧 Search limits configured and ready...")
     
     # Optionally override with different configuration:
-    configure_aggressive_search_limits()  # For faster execution
-    # configure_thorough_search_limits()    # For comprehensive research
+    # configure_aggressive_search_limits()  # For faster execution
+    configure_thorough_search_limits()    # For comprehensive research
     
     # Configuration options - change these to control execution
     RUN_FROM_BEGINNING = True  # Set to True to run from start, False to resume
@@ -242,7 +242,7 @@ if __name__ == "__main__":
     
     # Test the graph with a sample state - product limits now come from centralized config
     initial_state = OverallState(
-        user_query="sleep tracking device with app"
+        user_query="home physiotherapy device for Paraplegia patient"
     )
 
     config = {"configurable": {"thread_id": THREAD_ID}}

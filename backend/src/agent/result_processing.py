@@ -76,21 +76,27 @@ def select_final_products(state: OverallState) -> OverallState:
     products_string = json.dumps(products_full_info, indent=0, default=str)
 
     instructions = """ 
-        You are an expert product researcher. 
-       based on all research and price keep the products that have a competetiive advantage at least in one dimension. 
-       aim for maximum of {max_products_to_show} options, but less is also fine. 
-       something you would consider buying for yourself, do not be intellectual use common sense.
-       return a list of product ids you would consider buying. just the list, nothing else, no explanation, no text, no markdown, just the list of ids.
-       you have at least select two
-       example output:
-       ["id1", "id2", "id3"]
+    You are an expert product researcher. 
+    Based on all research and price, keep the products that have a COMPETITIVE ADVANTAGE in at least one dimension. 
+    Aim for a MAXIMUM of {max_products_to_show} options, but less is also fine. 
+    Choose something you would consider buying for yourself — do NOT overthink, use COMMON SENSE.
+    Return a list of PRODUCT IDs you would consider buying — JUST the list, nothing else (no explanation, no text, no markdown).
+    You must select AT LEAST TWO.
+    
+    ***CRITICAL RULE — READ CAREFULLY AND DO NOT IGNORE: ONLY select SPECIFIC PRODUCT MODELS — NOT categories, NOT brands.***
+    WRONG example: Smartphone-based sEMG  
+    CORRECT example: Spren Body Composition Scanner - Pro iOS App  
 
-       here is the query you are trying to solve:
-       {query}
+    Example output:
+    ["id1", "id2", "id3"]
 
-       here is the list of products you should consider:
-        {products_string}
-       """
+    Here is the query you are trying to solve:
+    {query}
+
+    Here is the list of products you should consider:
+    {products_string}
+    """
+
     
     max_products_to_show = get_max_research_products()
     instructions = instructions.format(

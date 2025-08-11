@@ -136,9 +136,8 @@ def step1_analyze_last_tool_call(state: Dict[str, Any],
     
     # Your exact prompt formatting and LLM call
     formatted_prompt = config.analyze_prompt.format(**format_context)
-    result = llm.with_structured_output(AnalysisResult).invoke(formatted_prompt)
-    return result.insights
-
+    result = llm.invoke(formatted_prompt)
+    return [result.content]
 
 def step2_generate_search_or_done(state: Dict[str, Any],
                                  result_tool_call_analysis: List[str],

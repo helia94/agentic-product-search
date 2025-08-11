@@ -19,15 +19,15 @@ rate_limiter = InMemoryRateLimiter(
 )
 
 llm_llama3 = ChatGroq(
-    model="llama3-8b-8192",
+    model="llama-3.1-8b-instant",
     temperature=0,
     max_tokens=None,
     timeout=None,
-    max_retries=2,
+    max_retries=10,
 )
 
 llm_gemini = ChatGoogleGenerativeAI(
-    model="gemini-2.0-flash",
+    model="gemini-2.0-flash-lite",
     temperature=0,
     max_tokens=None,
     timeout=None,

@@ -103,7 +103,7 @@ def create_product_explore_config() -> SearchConfig:
         
         <INSTRUCTIONS>
         Analyze the search results and extract specific products mentioned:
-        - Look for specific product models, not just categories or brands
+        - ONLY Look for specific product models, not just categories or brands. Wrong example: Smartphone-based sEMG. Correct example: Spren Body Composition Scanner - Pro ios app.  
         - Extract ALL details found: brand, model name, features, pricing, specifications, user feedback, availability, etc.
         - Focus on products that match the search query: {query}
         - Preserve ALL factual information found, including specific numbers, measurements, prices, technical details
@@ -156,6 +156,8 @@ def create_product_explore_config() -> SearchConfig:
         
         <INSTRUCTIONS>
         Format all discovered products into a JSON list with this exact structure:
+        - ONLY Look for specific product models, not just categories or brands. Wrong example: Smartphone-based sEMG. Correct example: Spren Body Composition Scanner - Pro ios app.  
+
         
         [
             {{
@@ -226,6 +228,8 @@ def format_products(state: State):
     PRESERVE ALL INFORMATION - do not summarize, shorten, or lose any details.
     Keep maximum {max_products} products based on relevance to query: {state.get("query", "")}
     For each product, include ALL available information in the appropriate fields.
+    ONLY Look for specific product models, DO not choose a product if it is just a category or brand. Wrong example: Smartphone-based sEMG. Correct example: Spren Body Composition Scanner - Pro ios app.  
+
     
     Text to process:
     {final_output}
