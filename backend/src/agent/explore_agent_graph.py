@@ -44,6 +44,12 @@ from langchain.globals import set_debug, set_verbose
 from agent.basic_tools import llm_gemini, tavily
 from agent.tool_orchestrator import SimpleToolOrchestrator
 from agent.search_pattern import BaseSearchState, execute_search_pattern_flexible, SearchConfig
+from agent.search_limits import (
+    get_search_limit, 
+    generate_search_prompt_text, 
+    is_search_limit_reached,
+    ComponentNames
+)
 from agent.research_with_pattern import research_graph_with_pattern
 
 #set_debug(True)
@@ -111,7 +117,7 @@ def create_product_explore_config() -> SearchConfig:
         Search for products based on the remaining queries:
         - Process queries one by one: {queries}
         - Search for specific products, models, and brands
-        - You have already searched {len_ai_queries} times
+        {search_limit_text}
         - Don't repeat previous searches: {ai_queries}
         - Focus on finding purchasable, specific product models
         - Stop when you have enough products ({max_explore_products}) or no more queries
@@ -167,7 +173,7 @@ def create_product_explore_config() -> SearchConfig:
             "max_explore_products": "max_explore_products"
         },
         
-        max_searches=2
+        component_name=ComponentNames.PRODUCT_EXPLORATION
     )
 
 

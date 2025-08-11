@@ -12,6 +12,12 @@ from langgraph.graph.message import add_messages
 from typing import Annotated
 import json
 from pydantic import BaseModel, Field
+from agent.search_limits import (
+    get_search_limit, 
+    generate_search_prompt_text, 
+    is_search_limit_reached,
+    ComponentNames
+)
 
 
 # Base state that all search subgraphs will extend
@@ -29,7 +35,12 @@ class SearchConfig(BaseModel):
     search_prompt: str = Field(description="Step 2: Generate new search or done")
     format_prompt: str = Field(description="Step 3: Format final output")
     state_field_mapping: Dict[str, str] = Field(description="Map template variables to state fields")
-    max_searches: int = Field(default=3, description="Maximum number of searches")
+    component_name: str = Field(description="Component name for search limits (e.g. 'product_research')")
+    
+    @property
+    def max_searches(self) -> int:
+        """Get max searches from centralized configuration"""
+        return get_search_limit(self.component_name)
 
 
 class AnalysisResult(BaseModel):
@@ -122,16 +133,18 @@ def step2_generate_search_or_done(state: Dict[str, Any],
         else:
             serializable_tool_info.append(str(item))
 
-    # Check max searches limit
-    if len(ai_queries) >= config.max_searches:
-        print(f"Skipping search query generation, reached maximum number of queries ({config.max_searches})")
+    # Check max searches limit using centralized configuration
+    if is_search_limit_reached(config.component_name, len(ai_queries)):
+        max_limit = get_search_limit(config.component_name)
+        print(f"Skipping search query generation, reached maximum number of queries ({max_limit}) for {config.component_name}")
         return None, serializable_tool_info
     
-    # Your exact search context
+    # Your exact search context with dynamic search limit text
     search_context = {
         "tool_saved_info": json.dumps(serializable_tool_info + result_tool_call_analysis),
         "ai_queries": json.dumps([msg.tool_calls[0].get("args", {}).get("query", "") for msg in ai_queries]),
         "len_ai_queries": len(ai_queries),
+        "search_limit_text": generate_search_prompt_text(config.component_name, len(ai_queries)),
     }
     
     # Apply configurable state mapping
@@ -258,7 +271,7 @@ def create_product_research_config() -> SearchConfig:
         Your task is to evaluate each product based on these criteria:
 
         - Write surgical search queries to evaluate the product based on the criteria.
-        - Use a MAX of 3 searches per product, ideally fewer. You already used {len_ai_queries} searches.
+        {search_limit_text}
         - START with obvious facts from seller pages (only if objective).
         - MOVE QUICKLY into digging for real-world evidence: reviews, Reddit threads, forums, expert opinions.
         - COMPARE products when possible, make judgments.
@@ -314,7 +327,7 @@ def create_product_research_config() -> SearchConfig:
             "criteria": "criteria"
         },
         
-        max_searches=3
+        component_name=ComponentNames.PRODUCT_RESEARCH
     )
 
 
@@ -358,5 +371,5 @@ def create_market_research_config() -> SearchConfig:
             "research_goals": "research_goals"
         },
         
-        max_searches=4
+        component_name=ComponentNames.PRODUCT_RESEARCH  # Use product_research limits for this example
     )

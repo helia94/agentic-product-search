@@ -22,6 +22,12 @@ from agent.state_V2 import ProductFull
 from agent.basic_tools import llm_gemini, tavily
 from agent.tool_orchestrator import SimpleToolOrchestrator
 from agent.search_pattern import BaseSearchState, execute_search_pattern_flexible, SearchConfig
+from agent.search_limits import (
+    get_search_limit, 
+    generate_search_prompt_text, 
+    is_search_limit_reached,
+    ComponentNames
+)
 
 #set_debug(True)
 #set_verbose(True)
@@ -101,7 +107,7 @@ def create_final_info_config() -> SearchConfig:
         </TASK>
 
         <CONSTRAINTS>
-        - Max 8 searches per product. You already used {len_ai_queries} searches.
+        {search_limit_text}
         - Be concise, avoid fluff. Use info-dense, direct language.
         - Review summaries = keyword-only, no generic opinions (e.g., say "short battery, clean app" not "great product").
         - Image URLs: 1–3, from official or reputable retailers.
@@ -213,7 +219,7 @@ def create_final_info_config() -> SearchConfig:
             "product": "product"
         },
         
-        max_searches=8
+        component_name=ComponentNames.FINAL_PRODUCT_INFO
     )
 
 
