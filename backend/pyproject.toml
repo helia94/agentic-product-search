@@ -29,7 +29,8 @@ dependencies = [
     "langchain-community",
     "praw",
     "langchain-google-vertexai",
-    "langgraph-checkpoint-sqlite"
+    "langgraph-checkpoint-sqlite",
+    "aiosqlite"
 ]
 
 

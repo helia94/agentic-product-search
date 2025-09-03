@@ -6,7 +6,13 @@
       "Bash(set PYTHONPATH=%cd%src)",
       "WebFetch(domain:python.langchain.com)",
       "WebFetch(domain:api.python.langchain.com)",
-      "WebFetch(domain:langchain-ai.github.io)"
+      "WebFetch(domain:langchain-ai.github.io)",
+      "Bash(npm install:*)",
+      "Bash(npm run build:*)",
+      "Bash(npm run dev:*)",
+      "Bash(grep:*)",
+      "Bash(find:*)",
+      "Bash(curl:*)"
     ],
     "deny": []
   }

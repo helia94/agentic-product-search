@@ -35,7 +35,6 @@ BALANCED_MODEL = ChatGoogleGenerativeAI(
 #    rate_limiter=rate_limiter,
 )
 
-BALANCED_MODEL = FAST_MODEL
 
 SMART_MODEL = ChatGoogleGenerativeAI(
     model="gemini-2.5-flash",
@@ -53,7 +52,7 @@ CREATIVE_MODEL =  ChatGoogleGenerativeAI(
     max_retries=10,
 )
 
-BALANCED_MODEL = FAST_MODEL
+#BALANCED_MODEL = FAST_MODEL
 #CREATIVE_MODEL = FAST_MODEL
 
 

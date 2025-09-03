@@ -124,6 +124,7 @@ class ProductFull(TypedDict):
 
 class OverallState(TypedDict):
     user_query: str
+    effort: str  # "low", "medium", "high" - controls search configuration
     country: str
     query_breakdown: QueryBreakDown
     query_tips: QueryTips

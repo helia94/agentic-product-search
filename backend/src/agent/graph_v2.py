@@ -30,6 +30,7 @@ from agent.search_limits import (
 
 
 
+
 # Create our Agent Graph
 builder = StateGraph(OverallState, config_schema=Configuration)
 
@@ -46,7 +47,7 @@ builder.add_node("save_results_to_disk", save_results_to_disk)
 builder.add_node("generate_html_results", generate_html_results)
 
 
-# Set the entrypoint as `planner`
+# Set the entrypoint 
 builder.add_edge(START, "pars_query")
 builder.add_edge("pars_query", "enrich_query")
 
@@ -68,7 +69,7 @@ builder.add_edge("save_results_to_disk", "generate_html_results")
 builder.add_edge("generate_html_results", END)
 
 
-# Create persistent SQLite checkpointer that survives process restarts
+# Create persistent SQLite checkpointer 
 checkpointer = SqliteSaver(sqlite3.connect("checkpoints.db", check_same_thread=False))
 
 # Compile the graph
@@ -150,7 +151,7 @@ def configure_aggressive_search_limits():
         # Aggressive Tavily settings - fewer results, basic search
         exploration_tavily_max_results=5,
         exploration_tavily_include_answer=False,
-        exploration_tavily_search_depth="basic",
+        exploration_tavily_search_depth="basic", 
         
         research_tavily_max_results=5,
         research_tavily_include_answer=True,
@@ -221,9 +222,7 @@ def initialize_graph_with_search_limits(search_mode: str = "default"):
     return graph
 
 
-# Initialize with default configuration when module is imported
-# This ensures search limits are set up when the module is loaded
-configure_search_limits_for_product_search()
+# Don't initialize config at module import - let each request configure it based on effort level
 
 
 
@@ -232,8 +231,8 @@ if __name__ == "__main__":
     print("🔧 Search limits configured and ready...")
     
     # Optionally override with different configuration:
-    # configure_aggressive_search_limits()  # For faster execution
-    configure_thorough_search_limits()    # For comprehensive research
+    configure_aggressive_search_limits()  # For faster execution
+    # configure_thorough_search_limits()    # For comprehensive research
     
     # Configuration options - change these to control execution
     RUN_FROM_BEGINNING = True  # Set to True to run from start, False to resume
@@ -242,7 +241,8 @@ if __name__ == "__main__":
     
     # Test the graph with a sample state - product limits now come from centralized config
     initial_state = OverallState(
-        user_query="home physiotherapy device for Paraplegia patient"
+        user_query="home physiotherapy device for Paraplegia patient",
+        effort="medium"  # Test with medium effort level
     )
 
     config = {"configurable": {"thread_id": THREAD_ID}}

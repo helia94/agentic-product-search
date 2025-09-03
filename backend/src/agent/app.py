@@ -8,21 +8,25 @@ from typing import Dict, Any, Optional
 from fastapi import FastAPI, Request, Response, HTTPException
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import StreamingResponse, FileResponse
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import fastapi.exceptions
 import asyncio
 from contextlib import asynccontextmanager
 
-# Import our graph
-from agent.graph_v2 import graph
+# Import our graph and configuration functions
+from agent.graph_v2 import (
+    graph, 
+    configure_search_limits_for_product_search,
+    configure_aggressive_search_limits,
+    configure_thorough_search_limits
+)
 from agent.state_V2 import OverallState
 
 # Request/Response models
 class ProductSearchRequest(BaseModel):
     query: str
-    max_explore_products: int = 15
-    max_research_products: int = 5
-    max_explore_queries: int = 10
+    effort: str = "medium"  # "low", "medium", "high"
 
 class StreamEvent(BaseModel):
     event: str
@@ -42,6 +46,20 @@ async def lifespan(app: FastAPI):
     print("🛑 Product Search API shutting down...")
 
 app = FastAPI(lifespan=lifespan)
+
+# Add CORS middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:5173", "http://localhost:5174", "http://localhost:3000"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Add main section for running with uvicorn
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8000)
 
 # Health check endpoint
 @app.get("/api/health")
@@ -209,14 +227,12 @@ async def run_graph_async(job_id: str, request: ProductSearchRequest):
     """
     try:
         # Update status
-        running_jobs[job_id]["status"] = "parsing_query"
+        running_jobs[job_id]["status"] = "initializing"
         
-        # Prepare initial state
+        # Prepare initial state with effort parameter - graph will configure limits internally
         initial_state = OverallState(
             user_query=request.query,
-            max_explore_products=request.max_explore_products,
-            max_research_products=request.max_research_products,
-            max_explore_queries=request.max_explore_queries,
+            effort=request.effort,
         )
         
         config = {"configurable": {"thread_id": job_id}}
@@ -234,18 +250,8 @@ async def run_graph_async(job_id: str, request: ProductSearchRequest):
             "generate_html_results": "generating_html"
         }
         
-        # Stream through graph execution
-        result_state = None
-        async for event in graph.astream(initial_state, config=config):
-            # Update status based on current node
-            for node_name, status in node_updates.items():
-                if node_name in event:
-                    running_jobs[job_id]["status"] = status
-                    break
-        
-        # Get final state
-        final_state = graph.get_state(config)
-        result_state = final_state.values
+        # Execute graph synchronously 
+        result_state = graph.invoke(initial_state, config=config)
         
         # Check if HTML was generated
         html_file_path = result_state.get("html_file_path")

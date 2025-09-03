@@ -203,4 +203,5 @@ backend/.langgraph_api
 modify/
 
 backend/src/results/*
+results/*
 checkpoints.*

@@ -6,6 +6,7 @@ import { InputForm } from "@/components/InputForm";
 import { Button } from "@/components/ui/button";
 import { useState, ReactNode, useMemo } from "react";
 import ReactMarkdown from "react-markdown";
+import DOMPurify from 'dompurify';
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -14,6 +15,23 @@ import {
 } from "@/components/ActivityTimeline"; // Assuming ActivityTimeline is in the same dir or adjust path
 import { ResearchThinkPanel } from "@/components/ResearchThinkPanel";
 import { transformEventsToHierarchy, EventData } from "@/utils/dataTransformer";
+
+// Utility function to detect if content is HTML
+const isHtmlContent = (content: string): boolean => {
+  const htmlPattern = /<!DOCTYPE html>|<html[^>]*>|<\/html>/i;
+  return htmlPattern.test(content.trim());
+};
+
+// Component for rendering HTML content safely
+const HtmlRenderer: React.FC<{ content: string }> = ({ content }) => {
+  const sanitizedHtml = DOMPurify.sanitize(content);
+  return (
+    <div 
+      dangerouslySetInnerHTML={{ __html: sanitizedHtml }}
+      className="w-full"
+    />
+  );
+};
 
 // Markdown component props type from former ReportView
 type MdComponentProps = {
@@ -147,15 +165,21 @@ const HumanMessageBubble: React.FC<HumanMessageBubbleProps> = ({
   message,
   mdComponents,
 }) => {
+  const content = typeof message.content === "string"
+    ? message.content
+    : JSON.stringify(message.content);
+
   return (
     <div
       className={`text-white rounded-3xl break-words min-h-7 bg-neutral-700 max-w-[100%] sm:max-w-[90%] px-4 pt-3 rounded-br-lg`}
     >
-      <ReactMarkdown components={mdComponents}>
-        {typeof message.content === "string"
-          ? message.content
-          : JSON.stringify(message.content)}
-      </ReactMarkdown>
+      {isHtmlContent(content) ? (
+        <HtmlRenderer content={content} />
+      ) : (
+        <ReactMarkdown components={mdComponents}>
+          {content}
+        </ReactMarkdown>
+      )}
     </div>
   );
 };
@@ -224,11 +248,21 @@ const AiMessageBubble: React.FC<AiMessageBubbleProps> = ({
           />
         </div>
       )}
-      <ReactMarkdown components={mdComponents}>
-        {typeof message.content === "string"
+      {(() => {
+        const content = typeof message.content === "string"
           ? message.content
-          : JSON.stringify(message.content)}
-      </ReactMarkdown>
+          : JSON.stringify(message.content);
+        
+        if (isHtmlContent(content)) {
+          return <HtmlRenderer content={content} />;
+        } else {
+          return (
+            <ReactMarkdown components={mdComponents}>
+              {content}
+            </ReactMarkdown>
+          );
+        }
+      })()}
       <Button
         variant="default"
         className="cursor-pointer bg-neutral-700 border-neutral-600 text-neutral-300 self-end"
