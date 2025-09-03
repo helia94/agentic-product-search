@@ -23,7 +23,9 @@ import json
 
 from langchain.globals import set_debug, set_verbose
 from agent.state_V2 import ProductSimple
-from agent.basic_tools import llm_gemini, llm_with_tools, route_tools_by_messages, tools, BasicToolNode, tavily
+from agent.basic_tools import llm_with_tools, route_tools_by_messages, tools, BasicToolNode, tavily
+from agent.llm_setup import get_llm
+from agent.search_pattern import retry_llm_tool_call
 from typing import Optional, List, Dict
 from pydantic import BaseModel, Field
 
@@ -198,7 +200,7 @@ def chatbot_research(state: State):
             last_tool_call_output=last_tool_call_output.content if hasattr(last_tool_call_output, 'content') else str(last_tool_call_output),
         )
 
-        result = llm_gemini.with_structured_output(ToolCallAnalysis).invoke(
+        result = get_llm("tool_call_analysis").with_structured_output(ToolCallAnalysis).invoke(
             formatted_instructions_1,
         )
         result_tool_call_analysis = result.insights
@@ -223,9 +225,8 @@ def chatbot_research(state: State):
             ai_queries=json.dumps([msg.tool_calls[0].get("args", {}).get("query", "") for msg in ai_queries]),
         )
 
-        result_search_query = llm_with_tools.invoke(
-            formatted_instructions_2,
-        )
+        llm_with_bound_tools = get_llm("search_query_generation").bind_tools(tools, parallel_tool_calls=True)
+        result_search_query = retry_llm_tool_call(llm_with_bound_tools, formatted_instructions_2)
     
     else:
         print("Skipping search query generation, reached maximum number of queries")
@@ -248,7 +249,7 @@ def chatbot_research(state: State):
             tool_saved_info=json.dumps(serializable_tool_info + result_tool_call_analysis)
         )
 
-        final_result = llm_gemini.invoke(
+        final_result = get_llm("search_result_analysis").invoke(
             formatted_instructions_3,
         )
 

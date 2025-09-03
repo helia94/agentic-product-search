@@ -4,13 +4,13 @@ from langgraph.types import interrupt
 
 from agent.state_V2 import OverallState, QueryBreakDown, QueryTips, Criteria
 from agent.configuration import Configuration
-from agent.llm_setup import llm_gemini, llm_llama3
+from agent.llm_setup import get_llm
 
 
 def pars_query(state: OverallState, config: RunnableConfig) -> OverallState:
     configurable = Configuration.from_runnable_config(config)
 
-    structured_llm = llm_gemini.with_structured_output(QueryBreakDown)
+    structured_llm = get_llm("query_breakdown").with_structured_output(QueryBreakDown)
     user_query = state.get("user_query") 
     query_parser_instructions = """
     I want to buy: {user_query} 
@@ -41,7 +41,7 @@ def pars_query(state: OverallState, config: RunnableConfig) -> OverallState:
 def enrich_query(state: OverallState, config: RunnableConfig) -> OverallState:
     configurable = Configuration.from_runnable_config(config)
 
-    structured_llm = llm_gemini.with_structured_output(QueryTips)
+    structured_llm = get_llm("query_tips").with_structured_output(QueryTips)
     user_query = state.get("user_query") 
     query_parser_instructions = """
         I want to buy something. Agent are gonna search step by step for it.
@@ -107,7 +107,7 @@ def human_ask_for_use_case(state: OverallState, config: RunnableConfig) -> dict:
         question=question,
         answer=answer
     )
-    selected_use_case = llm_llama3.invoke(formatted_prompt).content.strip()
+    selected_use_case = get_llm("use_case_selection").invoke(formatted_prompt).content.strip()
 
     print("Selected use case:", selected_use_case)
 
@@ -124,7 +124,7 @@ def human_ask_for_use_case(state: OverallState, config: RunnableConfig) -> dict:
 def find_criteria(state: OverallState, config: RunnableConfig) -> OverallState:
     configurable = Configuration.from_runnable_config(config)
 
-    structured_llm = llm_gemini.with_structured_output(Criteria)
+    structured_llm = get_llm("buying_criteria").with_structured_output(Criteria)
 
     product = state.get("query_breakdown", {}).get("product", "")
     use_case = state.get("query_breakdown", {}).get("use_case", "")

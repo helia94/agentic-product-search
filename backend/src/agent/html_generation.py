@@ -4,7 +4,7 @@ from datetime import datetime
 from langchain_core.runnables import RunnableConfig
 
 from agent.state_V2 import OverallState
-from agent.llm_setup import llm_gemini
+from agent.llm_setup import get_llm
 from agent.html_generation_prompt import HTML_GENERATION_PROMPT
 
 
@@ -37,7 +37,7 @@ def generate_html_results(state: OverallState, config: RunnableConfig) -> Overal
         
         # Generate HTML using the LLM
         print("🤖 Calling LLM to generate HTML...")
-        html_response = llm_gemini.invoke(formatted_prompt)
+        html_response = get_llm("html_generation").invoke(formatted_prompt)
         html_content = html_response.content if hasattr(html_response, 'content') else str(html_response)
         
         # Clean up the HTML content (remove any markdown formatting if present)

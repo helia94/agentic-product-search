@@ -41,7 +41,7 @@ import json
 
 from langchain_core.messages import ToolMessage
 from langchain.globals import set_debug, set_verbose
-from agent.basic_tools import llm_gemini
+from agent.llm_setup import get_llm
 from agent.tool_orchestrator import SimpleToolOrchestrator
 from agent.search_pattern import BaseSearchState, execute_search_pattern_flexible, SearchConfig
 from agent.search_limits import (
@@ -202,8 +202,8 @@ def chatbot_explore(state: State):
     
     return execute_search_pattern_flexible(
         state=state,
-        llm=llm_gemini,
-        llm_with_tools=tools_setup.bind_tools_to_llm(llm_gemini),
+        llm=get_llm("search_pattern"),
+        llm_with_tools=tools_setup.bind_tools_to_llm(get_llm("pattern_tool_calls")),
         config=config
     )
 
@@ -220,7 +220,7 @@ def format_products(state: State):
     final_output = state.get("final_output", "")
     print(f"Final explore output: {final_output}")
     
-    llm_with_structured_output = llm_gemini.with_structured_output(ProductSimpleList)
+    llm_with_structured_output = get_llm("product_exploration").with_structured_output(ProductSimpleList)
     max_products = state.get("max_explore_products", 15)
     
     result = llm_with_structured_output.invoke(f"""

@@ -5,7 +5,7 @@ from datetime import datetime
 from pydantic import BaseModel, Field
 
 from agent.state_V2 import OverallState
-from agent.llm_setup import llm_gemini
+from agent.llm_setup import get_llm
 from agent.search_limits import get_max_research_products
 
 
@@ -114,7 +114,7 @@ def select_final_products(state: OverallState) -> OverallState:
             description="Reasoning behind the selection of products, explaining how they compare in meet the user's needs."
         )
 
-    llm_gemini_structured = llm_gemini.with_structured_output(ProductSelection)
+    llm_gemini_structured = get_llm("product_selection").with_structured_output(ProductSelection)
     results = llm_gemini_structured.invoke(instructions)
 
     result_list = results.products

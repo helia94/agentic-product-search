@@ -19,7 +19,7 @@ load_dotenv()
 
 from langchain.globals import set_debug, set_verbose
 from agent.state_V2 import ProductFull
-from agent.basic_tools import llm_gemini
+from agent.llm_setup import get_llm
 from agent.tool_orchestrator import SimpleToolOrchestrator
 from agent.search_pattern import BaseSearchState, execute_search_pattern_flexible, SearchConfig
 from agent.search_limits import (
@@ -248,8 +248,8 @@ def chatbot_research_with_pattern(state: FinalInfoState):
     # Execute the 3-step pattern
     return execute_search_pattern_flexible(
         state=state,
-        llm=llm_gemini,
-        llm_with_tools=tools_setup.bind_tools_to_llm(llm_gemini),
+        llm=get_llm("search_pattern"),
+        llm_with_tools=tools_setup.bind_tools_to_llm(get_llm("pattern_tool_calls")),
         config=config
     )
 
@@ -285,7 +285,7 @@ def validate_and_fix_json(state: FinalInfoState):
         
         try:
             formatted_prompt = fix_prompt.format(final_output=final_output)
-            fixed_json = llm_gemini.invoke(formatted_prompt).content
+            fixed_json = get_llm("json_fixing").invoke(formatted_prompt).content
             
             # Validate the fixed JSON
             json.loads(fixed_json)
@@ -305,7 +305,7 @@ def convert_to_product_full(state: FinalInfoState):
     if not final_output:
         return {"product_output_formatted": None}
     
-    llm_structured = llm_gemini.with_structured_output(ProductFull)
+    llm_structured = get_llm("final_product_info").with_structured_output(ProductFull)
     
     conversion_prompt = """
     Convert this product information into a properly structured ProductFull object.

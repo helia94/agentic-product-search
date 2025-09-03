@@ -242,7 +242,7 @@ def configure_search_limits_from_main_graph(
         current_data.update(updates)
         SEARCH_LIMITS = SearchLimitsConfig(**current_data)
         
-        print(f"🔧 Updated search limits and Tavily config: {list(updates.keys())}")
+        print(f"Updated search limits and Tavily config: {list(updates.keys())}")
 
 
 # Component name constants for consistency

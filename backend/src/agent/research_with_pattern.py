@@ -19,7 +19,7 @@ from agent.search_pattern import SearchConfig
 load_dotenv()
 
 from agent.state_V2 import ProductSimple
-from agent.basic_tools import llm_gemini
+from agent.llm_setup import get_llm
 from agent.tool_orchestrator import SimpleToolOrchestrator
 from agent.search_pattern import BaseSearchState, execute_search_pattern_flexible
 from agent.search_limits import get_tavily_config, ComponentNames
@@ -188,8 +188,8 @@ def chatbot_research_with_pattern(state: ProductResearchState):
     # Execute the 3-step pattern with your exact logic
     return execute_search_pattern_flexible(
         state=state,
-        llm=llm_gemini,
-        llm_with_tools=tools_setup.bind_tools_to_llm(llm_gemini),
+        llm=get_llm("search_pattern"),
+        llm_with_tools=tools_setup.bind_tools_to_llm(get_llm("pattern_tool_calls")),
         config=config
     )
 

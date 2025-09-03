@@ -122,10 +122,10 @@ def configure_search_limits_for_product_search():
         final_info_tavily_include_answer=False,
         final_info_tavily_search_depth="basic"
     )
-    print("🎯 Search limits configured: explore=2, research=3, final=8")
-    print("📦 Product limits: explore=2 products, research=2 products, queries=5")
-    print("🚀 Concurrent searches: exploration=2, research=3, final=2 parallel calls per step")
-    print("🔍 Tavily configured: exploration=3/basic, research=5/advanced, final=4/basic")
+    print("Search limits configured: explore=2, research=3, final=8")
+    print("Product limits: explore=2 products, research=2 products, queries=5")
+    print("Concurrent searches: exploration=2, research=3, final=2 parallel calls per step")
+    print("Tavily configured: exploration=3/basic, research=5/advanced, final=4/basic")
 
 
 def configure_aggressive_search_limits():

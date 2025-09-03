@@ -2,14 +2,14 @@ from langchain_core.runnables import RunnableConfig
 
 from agent.state_V2 import OverallState, Queries
 from agent.configuration import Configuration
-from agent.llm_setup import llm_gemini
+from agent.llm_setup import get_llm
 from agent.search_limits import get_max_explore_queries
 
 
 def query_generator(state: OverallState, config: RunnableConfig) -> OverallState:
     configurable = Configuration.from_runnable_config(config)
 
-    structured_llm = llm_gemini.with_structured_output(Queries)
+    structured_llm = get_llm("query_generation").with_structured_output(Queries)
 
     product = state.get("query_breakdown", {}).get("product", "")
     use_case = state.get("query_breakdown", {}).get("use_case", "")
