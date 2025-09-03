@@ -16,10 +16,7 @@ from contextlib import asynccontextmanager
 
 # Import our graph and configuration functions
 from agent.graph_v2 import (
-    graph, 
-    configure_search_limits_for_product_search,
-    configure_aggressive_search_limits,
-    configure_thorough_search_limits
+    graph
 )
 from agent.state_V2 import OverallState
 

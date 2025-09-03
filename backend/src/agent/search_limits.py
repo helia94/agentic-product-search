@@ -250,3 +250,137 @@ class ComponentNames:
     PRODUCT_EXPLORATION = "product_exploration"  # explore_agent_graph.py
     PRODUCT_RESEARCH = "product_research"        # research_with_pattern.py
     FINAL_PRODUCT_INFO = "final_product_info"    # final_info_graph.py
+
+
+def configure_search_limits_for_product_search():
+    """
+    Configure search limits for the product search workflow.
+    Simple configuration with just three values - one per search pattern.
+    Also configures Tavily settings and product processing limits for each component.
+    """
+    configure_search_limits_from_main_graph(
+        product_exploration=2,      # explore-agent-graph 
+        product_research=3,         # research-with-pattern
+        final_product_info=8,       # final-info-graph
+        
+        # Product processing limits
+        max_explore_products=2,
+        max_research_products=2,
+        max_explore_queries=5,
+        
+        # Concurrent search configuration - parallel tool calls per step
+        exploration_concurrent_searches=3,
+        research_concurrent_searches=3,
+        final_info_concurrent_searches=3,
+        
+        # Tavily configuration - customize these settings
+        exploration_tavily_max_results=3,
+        exploration_tavily_include_answer=False,
+        exploration_tavily_search_depth="basic",
+        
+        research_tavily_max_results=5,
+        research_tavily_include_answer=True,
+        research_tavily_search_depth="advanced",
+        
+        final_info_tavily_max_results=4,
+        final_info_tavily_include_answer=False,
+        final_info_tavily_search_depth="basic"
+    )
+    print("Search limits configured: explore=2, research=3, final=8")
+    print("Product limits: explore=2 products, research=2 products, queries=5")
+    print("Concurrent searches: exploration=2, research=3, final=2 parallel calls per step")
+    print("Tavily configured: exploration=3/basic, research=5/advanced, final=4/basic")
+
+
+def configure_aggressive_search_limits():
+    """
+    Configure more aggressive (faster) search limits for quick results.
+    """
+    configure_search_limits_from_main_graph(
+        product_exploration=3,
+        product_research=3, 
+        final_product_info=3,
+        
+        # Aggressive product limits - fewer products for speed
+        max_explore_products=2,
+        max_research_products=1,
+        max_explore_queries=3,
+        
+        # Aggressive concurrent searches - more parallel calls for speed
+        exploration_concurrent_searches=2,
+        research_concurrent_searches=2,
+        final_info_concurrent_searches=2,
+        
+        # Aggressive Tavily settings - fewer results, basic search
+        exploration_tavily_max_results=5,
+        exploration_tavily_include_answer=False,
+        exploration_tavily_search_depth="basic", 
+        
+        research_tavily_max_results=5,
+        research_tavily_include_answer=True,
+        research_tavily_search_depth="basic",
+        
+        final_info_tavily_max_results=5,
+        final_info_tavily_include_answer=True,
+        final_info_tavily_search_depth="basic"
+    )
+    print("⚡ Aggressive search limits: explore=3, research=3, final=3")
+    print("📦 Aggressive product limits: explore=2 products, research=1 product, queries=3")
+    print("🚀 Aggressive concurrent: exploration=3, research=4, final=3 parallel calls per step")
+    print("🔍 Aggressive Tavily: exploration=5/basic, research=5/basic, final=5/basic")
+
+
+def configure_thorough_search_limits():
+    """
+    Configure more thorough search limits for comprehensive research.
+    """
+    configure_search_limits_from_main_graph(
+        product_exploration=5,
+        product_research=10,
+        final_product_info=10,
+        
+        # Thorough product limits - more products for comprehensive analysis
+        max_explore_queries=7,
+        max_explore_products=10,
+        max_research_products=5,
+        
+        # Thorough concurrent searches - moderate parallel calls for accuracy
+        exploration_concurrent_searches=3,
+        research_concurrent_searches=3,
+        final_info_concurrent_searches=3,
+        
+        # Thorough Tavily settings - more results, advanced search
+        exploration_tavily_max_results=5,
+        exploration_tavily_include_answer=False,
+        exploration_tavily_search_depth="basic",
+        
+        research_tavily_max_results=20,
+        research_tavily_include_answer=True,
+        research_tavily_search_depth="advanced",
+        
+        final_info_tavily_max_results=10,
+        final_info_tavily_include_answer=True,
+        final_info_tavily_search_depth="advanced"
+    )
+    print("🔍 Thorough search limits: explore=5, research=10, final=10")
+    print("📦 Thorough product limits: explore=7 products, research=2 products, queries=5")
+    print("🚀 Thorough concurrent: exploration=2, research=3, final=3 parallel calls per step")
+    print("🔍 Thorough Tavily: exploration=5/basic, research=20/advanced, final=10/advanced")
+
+
+def initialize_graph_with_search_limits(search_mode: str = "default"):
+    """
+    Initialize the graph with specified search limit configuration.
+    
+    Args:
+        search_mode: "default", "aggressive", or "thorough"
+    
+    Returns:
+        None (configuration is applied globally)
+    """
+    if search_mode == "aggressive":
+        configure_aggressive_search_limits()
+    elif search_mode == "thorough":
+        configure_thorough_search_limits() 
+    else:
+        configure_search_limits_for_product_search()

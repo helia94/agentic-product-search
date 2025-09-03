@@ -19,11 +19,20 @@ rate_limiter = InMemoryRateLimiter(
 )
 
 # Model class definitions
-FAST_MODEL = ChatGroq(
-    model="openai/gpt-oss-20b",
+#FAST_MODEL = ChatGroq(
+#    model="openai/gpt-oss-20b",
+#    temperature=0,
+#    max_tokens=None,
+#    max_retries=10,
+#)
+
+FAST_MODEL = ChatGoogleGenerativeAI(
+    model="gemini-2.0-flash-lite",
     temperature=0,
     max_tokens=None,
+    timeout=None,
     max_retries=10,
+#    rate_limiter=rate_limiter,
 )
 
 BALANCED_MODEL = ChatGoogleGenerativeAI(

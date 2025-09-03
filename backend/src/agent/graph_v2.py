@@ -19,13 +19,7 @@ from agent.product_orchestration import call_product_search_graph, complete_prod
 from agent.result_processing import save_results_to_disk, select_final_products
 from agent.html_generation import generate_html_results
 from agent.configuration import Configuration
-from agent.search_limits import (
-    configure_search_limits_from_main_graph, 
-    ComponentNames,
-    get_max_explore_products,
-    get_max_research_products, 
-    get_max_explore_queries
-)
+from agent.search_limits import initialize_graph_with_search_limits
 
 
 
@@ -75,164 +69,13 @@ checkpointer = SqliteSaver(sqlite3.connect("checkpoints.db", check_same_thread=F
 # Compile the graph
 graph = builder.compile(name="product-search-agent", checkpointer=checkpointer)
 
-# =====================================================================================
-# SEARCH LIMITS CONFIGURATION
-# =====================================================================================
-# The search limits are centrally managed and applied across all search components:
-# 
-# - explore_agent_graph.py: Uses ComponentNames.PRODUCT_EXPLORATION limits (2)
-# - research_with_pattern.py: Uses ComponentNames.PRODUCT_RESEARCH limits (3)
-# - final_info_graph.py: Uses ComponentNames.FINAL_PRODUCT_INFO limits (8)
-#
-# Both prompts and hard checks use the same centralized values, ensuring consistency.
-# Just three simple values - one per search pattern as requested.
-# =====================================================================================
-
-
-def configure_search_limits_for_product_search():
-    """
-    Configure search limits for the product search workflow.
-    Simple configuration with just three values - one per search pattern.
-    Also configures Tavily settings and product processing limits for each component.
-    """
-    configure_search_limits_from_main_graph(
-        product_exploration=2,      # explore-agent-graph 
-        product_research=3,         # research-with-pattern
-        final_product_info=8,       # final-info-graph
-        
-        # Product processing limits
-        max_explore_products=2,
-        max_research_products=2,
-        max_explore_queries=5,
-        
-        # Concurrent search configuration - parallel tool calls per step
-        exploration_concurrent_searches=3,
-        research_concurrent_searches=3,
-        final_info_concurrent_searches=3,
-        
-        # Tavily configuration - customize these settings
-        exploration_tavily_max_results=3,
-        exploration_tavily_include_answer=False,
-        exploration_tavily_search_depth="basic",
-        
-        research_tavily_max_results=5,
-        research_tavily_include_answer=True,
-        research_tavily_search_depth="advanced",
-        
-        final_info_tavily_max_results=4,
-        final_info_tavily_include_answer=False,
-        final_info_tavily_search_depth="basic"
-    )
-    print("Search limits configured: explore=2, research=3, final=8")
-    print("Product limits: explore=2 products, research=2 products, queries=5")
-    print("Concurrent searches: exploration=2, research=3, final=2 parallel calls per step")
-    print("Tavily configured: exploration=3/basic, research=5/advanced, final=4/basic")
-
-
-def configure_aggressive_search_limits():
-    """
-    Configure more aggressive (faster) search limits for quick results.
-    """
-    configure_search_limits_from_main_graph(
-        product_exploration=3,
-        product_research=3, 
-        final_product_info=3,
-        
-        # Aggressive product limits - fewer products for speed
-        max_explore_products=2,
-        max_research_products=1,
-        max_explore_queries=3,
-        
-        # Aggressive concurrent searches - more parallel calls for speed
-        exploration_concurrent_searches=2,
-        research_concurrent_searches=2,
-        final_info_concurrent_searches=2,
-        
-        # Aggressive Tavily settings - fewer results, basic search
-        exploration_tavily_max_results=5,
-        exploration_tavily_include_answer=False,
-        exploration_tavily_search_depth="basic", 
-        
-        research_tavily_max_results=5,
-        research_tavily_include_answer=True,
-        research_tavily_search_depth="basic",
-        
-        final_info_tavily_max_results=5,
-        final_info_tavily_include_answer=True,
-        final_info_tavily_search_depth="basic"
-    )
-    print("⚡ Aggressive search limits: explore=3, research=3, final=3")
-    print("📦 Aggressive product limits: explore=2 products, research=1 product, queries=3")
-    print("🚀 Aggressive concurrent: exploration=3, research=4, final=3 parallel calls per step")
-    print("🔍 Aggressive Tavily: exploration=5/basic, research=5/basic, final=5/basic")
-
-
-def configure_thorough_search_limits():
-    """
-    Configure more thorough search limits for comprehensive research.
-    """
-    configure_search_limits_from_main_graph(
-        product_exploration=5,
-        product_research=10,
-        final_product_info=10,
-        
-        # Thorough product limits - more products for comprehensive analysis
-        max_explore_queries=7,
-        max_explore_products=10,
-        max_research_products=5,
-        
-        # Thorough concurrent searches - moderate parallel calls for accuracy
-        exploration_concurrent_searches=3,
-        research_concurrent_searches=3,
-        final_info_concurrent_searches=3,
-        
-        # Thorough Tavily settings - more results, advanced search
-        exploration_tavily_max_results=5,
-        exploration_tavily_include_answer=False,
-        exploration_tavily_search_depth="basic",
-        
-        research_tavily_max_results=20,
-        research_tavily_include_answer=True,
-        research_tavily_search_depth="advanced",
-        
-        final_info_tavily_max_results=10,
-        final_info_tavily_include_answer=True,
-        final_info_tavily_search_depth="advanced"
-    )
-    print("🔍 Thorough search limits: explore=5, research=10, final=10")
-    print("📦 Thorough product limits: explore=7 products, research=2 products, queries=5")
-    print("🚀 Thorough concurrent: exploration=2, research=3, final=3 parallel calls per step")
-    print("🔍 Thorough Tavily: exploration=5/basic, research=20/advanced, final=10/advanced")
-
-
-def initialize_graph_with_search_limits(search_mode: str = "default"):
-    """
-    Initialize the graph with specified search limit configuration.
-    
-    Args:
-        search_mode: "default", "aggressive", or "thorough"
-    """
-    if search_mode == "aggressive":
-        configure_aggressive_search_limits()
-    elif search_mode == "thorough":
-        configure_thorough_search_limits() 
-    else:
-        configure_search_limits_for_product_search()
-    
-    return graph
-
-
-# Don't initialize config at module import - let each request configure it based on effort level
 
 
 
 if __name__ == "__main__":
     # Search limits are already configured when module is imported
     print("🔧 Search limits configured and ready...")
-    
-    # Optionally override with different configuration:
-    configure_aggressive_search_limits()  # For faster execution
-    # configure_thorough_search_limits()    # For comprehensive research
+    initialize_graph_with_search_limits(search_mode = "aggressive")
     
     # Configuration options - change these to control execution
     RUN_FROM_BEGINNING = True  # Set to True to run from start, False to resume
@@ -250,7 +93,16 @@ if __name__ == "__main__":
     if RUN_FROM_BEGINNING:
         print("🚀 Running from beginning...")
         result_state = graph.invoke(initial_state, config=config)
-        result_state = graph.invoke(Command(resume="2"), config=config)
+        
+        # Check if graph execution is incomplete and needs resume
+        if (hasattr(result_state, 'query_tips') and 
+            hasattr(result_state.query_tips, 'potential_use_cases_to_clarify') and 
+            result_state.query_tips.potential_use_cases_to_clarify and
+            (not hasattr(result_state, 'queries') or not result_state.queries) and
+            (not hasattr(result_state, 'html_report') or not result_state.html_report)):
+            print("🔄 Graph not fully complete, invoking resume...")
+            result_state = graph.invoke(Command(resume="2"), config=config)
+        
         print("✅ Execution completed from beginning")
         print(json.dumps(result_state, indent=2, default=str))
     else:
