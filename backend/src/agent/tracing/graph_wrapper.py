@@ -11,7 +11,7 @@ from langgraph.types import PregelTask
 from langchain_core.callbacks import BaseCallbackHandler
 from langchain_core.outputs import LLMResult
 
-from agent.graph_progress_tracker import (
+from agent.tracing.graph_progress_tracker import (
     start_job_tracking, 
     track_node_start, 
     track_node_end, 
@@ -118,7 +118,7 @@ class TrackedGraphExecutor:
         Returns:
             Final state after graph execution
         """
-        from agent.web_tracer import info
+        from agent.tracing.web_tracer import info
         info("WRAPPER", f"Starting tracked execution for job {job_id}", job_id)
         
         # Start tracking this job

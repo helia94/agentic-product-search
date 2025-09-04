@@ -14,7 +14,7 @@ import json
 import time
 import logging
 from pydantic import BaseModel, Field
-from agent.search_limits import (
+from agent.configuration.search_limits import (
     get_search_limit, 
     generate_search_prompt_text, 
     is_search_limit_reached,

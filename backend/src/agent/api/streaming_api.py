@@ -8,7 +8,7 @@ from typing import Dict, Any, Optional, AsyncGenerator
 from datetime import datetime
 from pydantic import BaseModel
 
-from agent.node_progress import get_progress_events, NodeEvent
+from agent.tracing.node_progress import get_progress_events, NodeEvent
 
 
 class StreamEvent(BaseModel):

@@ -9,7 +9,7 @@ import os
 # Add the src directory to the path so we can import the agent modules
 sys.path.append(os.path.join(os.path.dirname(__file__)))
 
-from agent.search_limits import (
+from agent.configuration.search_limits import (
     SEARCH_LIMITS, 
     get_search_limit, 
     generate_search_prompt_text,
@@ -93,7 +93,7 @@ def test_graph_v2_integration():
     print("🧪 Testing graph_v2 integration...")
     
     try:
-        from agent.graph_v2 import (
+        from agent.graph.graph_v2 import (
             configure_search_limits_for_product_search,
             configure_aggressive_search_limits,
             configure_thorough_search_limits,

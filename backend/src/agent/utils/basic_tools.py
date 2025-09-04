@@ -1,8 +1,8 @@
 
-from agent.llm_setup import get_llm
+from agent.configuration.llm_setup import get_llm
 from langchain_tavily import TavilySearch
 from langchain_core.rate_limiters import InMemoryRateLimiter
-from agent.tool_orchestrator import create_tool_node, create_tool_router
+from agent.utils.tool_orchestrator import create_tool_node, create_tool_router
 from langchain_google_vertexai import ChatVertexAI
 
 import os

@@ -15,14 +15,14 @@ from typing import Annotated
 
 from dotenv import load_dotenv
 
-from agent.search_pattern import SearchConfig
+from agent.graph.search_pattern import SearchConfig
 load_dotenv()
 
-from agent.state_V2 import ProductSimple
-from agent.llm_setup import get_llm
-from agent.tool_orchestrator import SimpleToolOrchestrator
-from agent.search_pattern import BaseSearchState, execute_search_pattern_flexible
-from agent.search_limits import get_tavily_config, ComponentNames
+from agent.graph.state_V2 import ProductSimple
+from agent.configuration.llm_setup import get_llm
+from agent.utils.tool_orchestrator import SimpleToolOrchestrator
+from agent.graph.search_pattern import BaseSearchState, execute_search_pattern_flexible
+from agent.configuration.search_limits import get_tavily_config, ComponentNames
 from langchain_tavily import TavilySearch
 
 from langchain.globals import set_debug

@@ -9,18 +9,18 @@ from langgraph.graph import START, END
 from langgraph.types import Command
 from langgraph.checkpoint.sqlite import SqliteSaver
 
-from agent.state_V2 import OverallState
-from agent.query_processing import (
+from agent.graph.state_V2 import OverallState
+from agent.utils.query_processing import (
     pars_query, enrich_query, should_ask_for_use_case, 
     human_ask_for_use_case, find_criteria
 )
-from agent.query_generation import query_generator
-from agent.product_orchestration import call_product_search_graph, complete_product_info
-from agent.result_processing import save_results_to_disk, select_final_products
-from agent.html_generation import generate_html_results
-from agent.manual_progress_tracker import create_tracked_node_wrapper
+from agent.utils.query_generation import query_generator
+from agent.graph.product_orchestration import call_product_search_graph, complete_product_info
+from agent.utils.result_processing import save_results_to_disk, select_final_products
+from agent.utils.html_generation import generate_html_results
+from agent.tracing.manual_progress_tracker import create_tracked_node_wrapper
 from agent.configuration import Configuration
-from agent.search_limits import initialize_graph_with_search_limits
+from agent.configuration.search_limits import initialize_graph_with_search_limits
 
 
 

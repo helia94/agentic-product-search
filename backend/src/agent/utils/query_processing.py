@@ -2,10 +2,10 @@ from typing import List
 from langchain_core.runnables import RunnableConfig
 from langgraph.types import interrupt
 
-from agent.state_V2 import OverallState, QueryBreakDown, QueryTips, Criteria
+from agent.graph.state_V2 import OverallState, QueryBreakDown, QueryTips, Criteria
 from agent.configuration import Configuration
-from agent.llm_setup import get_llm
-from agent.node_progress import track_node_progress
+from agent.configuration.llm_setup import get_llm
+from agent.tracing.node_progress import track_node_progress
 
 
 @track_node_progress("pars_query")

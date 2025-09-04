@@ -15,7 +15,7 @@ from langchain_core.runnables import RunnableConfig
 from google.genai import Client
 import tiktoken  # Ensure tiktoken is installed in the environment
 
-from agent.state_V2 import  ProductSimple, ProductSimpleList
+from agent.graph.state_V2 import  ProductSimple, ProductSimpleList
 from agent.configuration import Configuration
 
 from langchain_google_genai import ChatGoogleGenerativeAI
@@ -41,10 +41,10 @@ import json
 
 from langchain_core.messages import ToolMessage
 from langchain.globals import set_debug, set_verbose
-from agent.llm_setup import get_llm
-from agent.tool_orchestrator import SimpleToolOrchestrator
-from agent.search_pattern import BaseSearchState, execute_search_pattern_flexible, SearchConfig
-from agent.search_limits import (
+from agent.configuration.llm_setup import get_llm
+from agent.utils.tool_orchestrator import SimpleToolOrchestrator
+from agent.graph.search_pattern import BaseSearchState, execute_search_pattern_flexible, SearchConfig
+from agent.configuration.search_limits import (
     get_search_limit, 
     generate_search_prompt_text, 
     is_search_limit_reached,
@@ -52,7 +52,7 @@ from agent.search_limits import (
     ComponentNames
 )
 from langchain_tavily import TavilySearch
-from agent.research_with_pattern import research_graph_with_pattern
+from agent.graph.research_with_pattern import research_graph_with_pattern
 
 #set_debug(True)
 #set_verbose(True)

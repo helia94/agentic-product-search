@@ -3,9 +3,9 @@ import json
 from datetime import datetime
 from langchain_core.runnables import RunnableConfig
 
-from agent.state_V2 import OverallState
-from agent.llm_setup import get_llm
-from agent.html_generation_prompt import HTML_GENERATION_PROMPT
+from agent.graph.state_V2 import OverallState
+from agent.configuration.llm_setup import get_llm
+from agent.utils.html_generation_prompt import HTML_GENERATION_PROMPT
 
 
 def generate_html_results(state: OverallState, config: RunnableConfig) -> OverallState:

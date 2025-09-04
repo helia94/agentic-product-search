@@ -18,11 +18,11 @@ from dotenv import load_dotenv
 load_dotenv()
 
 from langchain.globals import set_debug, set_verbose
-from agent.state_V2 import ProductFull
-from agent.llm_setup import get_llm
-from agent.tool_orchestrator import SimpleToolOrchestrator
-from agent.search_pattern import BaseSearchState, execute_search_pattern_flexible, SearchConfig
-from agent.search_limits import (
+from agent.graph.state_V2 import ProductFull
+from agent.configuration.llm_setup import get_llm
+from agent.utils.tool_orchestrator import SimpleToolOrchestrator
+from agent.graph.search_pattern import BaseSearchState, execute_search_pattern_flexible, SearchConfig
+from agent.configuration.search_limits import (
     get_search_limit, 
     generate_search_prompt_text, 
     is_search_limit_reached,
