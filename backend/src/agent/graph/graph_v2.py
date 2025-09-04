@@ -18,7 +18,6 @@ from agent.utils.query_generation import query_generator
 from agent.graph.product_orchestration import call_product_search_graph, complete_product_info
 from agent.utils.result_processing import save_results_to_disk, select_final_products
 from agent.utils.html_generation import generate_html_results
-from agent.tracing.manual_progress_tracker import create_tracked_node_wrapper
 from agent.configuration import Configuration
 from agent.configuration.search_limits import initialize_graph_with_search_limits
 
@@ -29,30 +28,19 @@ from agent.configuration.search_limits import initialize_graph_with_search_limit
 # Create our Agent Graph
 builder = StateGraph(OverallState, config_schema=Configuration)
 
-# Define the nodes with progress tracking
-print("[GRAPH] Creating tracked nodes...")
-tracked_pars_query = create_tracked_node_wrapper(pars_query, "pars_query", "product-search-main")
-tracked_enrich_query = create_tracked_node_wrapper(enrich_query, "enrich_query", "product-search-main")
-tracked_human_ask_for_use_case = create_tracked_node_wrapper(human_ask_for_use_case, "human_ask_for_use_case", "product-search-main")
-tracked_find_criteria = create_tracked_node_wrapper(find_criteria, "find_criteria", "product-search-main")
-tracked_query_generator = create_tracked_node_wrapper(query_generator, "query_generator", "product-search-main")
-tracked_call_product_search_graph = create_tracked_node_wrapper(call_product_search_graph, "call_product_search_graph", "product-search-main")
-tracked_complete_product_info = create_tracked_node_wrapper(complete_product_info, "complete_product_info", "product-search-main")
-tracked_select_final_products = create_tracked_node_wrapper(select_final_products, "select_final_products", "product-search-main")
-tracked_save_results_to_disk = create_tracked_node_wrapper(save_results_to_disk, "save_results_to_disk", "product-search-main")
-tracked_generate_html_results = create_tracked_node_wrapper(generate_html_results, "generate_html_results", "product-search-main")
+
 
 # Add tracked nodes to the graph
-builder.add_node("pars_query", tracked_pars_query) 
-builder.add_node("enrich_query", tracked_enrich_query)
-builder.add_node("human_ask_for_use_case", tracked_human_ask_for_use_case)
-builder.add_node("find_criteria", tracked_find_criteria)
-builder.add_node("query_generator", tracked_query_generator)
-builder.add_node("call_product_search_graph", tracked_call_product_search_graph)
-builder.add_node("complete_product_info", tracked_complete_product_info)
-builder.add_node("select_final_products", tracked_select_final_products)
-builder.add_node("save_results_to_disk", tracked_save_results_to_disk)
-builder.add_node("generate_html_results", tracked_generate_html_results)
+builder.add_node("pars_query", pars_query) 
+builder.add_node("enrich_query", enrich_query)
+builder.add_node("human_ask_for_use_case", human_ask_for_use_case)
+builder.add_node("find_criteria", find_criteria)
+builder.add_node("query_generator", query_generator)
+builder.add_node("call_product_search_graph", call_product_search_graph)
+builder.add_node("complete_product_info", complete_product_info)
+builder.add_node("select_final_products", select_final_products)
+builder.add_node("save_results_to_disk", save_results_to_disk)
+builder.add_node("generate_html_results", generate_html_results)
 print("[GRAPH] All nodes wrapped with progress tracking")
 
 
