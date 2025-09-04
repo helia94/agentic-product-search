@@ -140,3 +140,8 @@ class OverallState(TypedDict):
     max_explore_products: int
     max_research_products: int
     max_explore_queries: int
+    
+    # Human interaction fields
+    human_question: Optional[str]  # Question to ask the user
+    human_answer: Optional[str]    # User's response
+    awaiting_human: Optional[bool] # Flag indicating human input needed

@@ -1,0 +1,26 @@
+version: '3.8'
+
+services:
+  jaeger:
+    image: jaegertracing/all-in-one:latest
+    container_name: jaeger-tracing
+    environment:
+      - COLLECTOR_OTLP_ENABLED=true
+    ports:
+      # Jaeger UI
+      - "16686:16686"
+      # HTTP collector
+      - "14268:14268"
+      # gRPC collector
+      - "14250:14250"
+      # OTLP gRPC receiver
+      - "4317:4317"
+      # OTLP HTTP receiver
+      - "4318:4318"
+    restart: unless-stopped
+    networks:
+      - tracing
+
+networks:
+  tracing:
+    driver: bridge

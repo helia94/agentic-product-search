@@ -12,7 +12,8 @@
       "Bash(npm run dev:*)",
       "Bash(grep:*)",
       "Bash(find:*)",
-      "Bash(curl:*)"
+      "Bash(curl:*)",
+      "Bash(dir results)"
     ],
     "deny": []
   }

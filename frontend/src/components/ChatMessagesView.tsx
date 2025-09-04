@@ -14,6 +14,8 @@ import {
   ProcessedEvent,
 } from "@/components/ActivityTimeline"; // Assuming ActivityTimeline is in the same dir or adjust path
 import { ResearchThinkPanel } from "@/components/ResearchThinkPanel";
+import { ProgressTracker } from "@/components/ProgressTracker";
+import { HumanInteractionModal } from "@/components/HumanInteractionModal";
 import { transformEventsToHierarchy, EventData } from "@/utils/dataTransformer";
 
 // Utility function to detect if content is HTML
@@ -282,6 +284,28 @@ const AiMessageBubble: React.FC<AiMessageBubbleProps> = ({
   );
 };
 
+// Add new interfaces for progress tracking
+interface NodeProgressEvent {
+  event_type: "node_start" | "node_end" | "node_error" | "graph_start" | "graph_end";
+  node_name: string;
+  graph_name: string;
+  duration_ms?: number;
+  error?: string;
+  metadata?: Record<string, any>;
+}
+
+interface JobStatus {
+  status: string;
+  query: string;
+  html_file_path?: string;
+  error?: string;
+}
+
+interface HumanInteractionRequest {
+  question: string;
+  query: string;
+}
+
 interface ChatMessagesViewProps {
   messages: Message[];
   isLoading: boolean;
@@ -290,6 +314,12 @@ interface ChatMessagesViewProps {
   onCancel: () => void;
   liveActivityEvents: ProcessedEvent[];
   historicalActivities: Record<string, ProcessedEvent[]>;
+  // New props for progress tracking
+  progressEvents?: NodeProgressEvent[];
+  currentStatus?: JobStatus | null;
+  humanRequest?: HumanInteractionRequest | null;
+  onSubmitHumanResponse?: (response: string) => void;
+  onStop?: () => void;
 }
 
 export function ChatMessagesView({
@@ -300,6 +330,11 @@ export function ChatMessagesView({
   onCancel,
   liveActivityEvents,
   historicalActivities,
+  progressEvents = [],
+  currentStatus = null,
+  humanRequest = null,
+  onSubmitHumanResponse,
+  onStop,
 }: ChatMessagesViewProps) {
   const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
   const [showThinkPanel, setShowThinkPanel] = useState(true);
@@ -346,9 +381,20 @@ export function ChatMessagesView({
   }, [messages, liveActivityEvents, isLoading]); // Add isLoading dependency to ensure real-time updates
 
   return (
-    <div className="flex h-full">
-      {/* Left message area */}
-      <div className={`flex flex-col transition-all duration-300 ${showThinkPanel ? 'w-1/2' : 'w-full'}`}>
+    <>
+      {/* Human Interaction Modal */}
+      {humanRequest && onSubmitHumanResponse && (
+        <HumanInteractionModal
+          question={humanRequest.question}
+          query={humanRequest.query}
+          onSubmit={onSubmitHumanResponse}
+          isVisible={true}
+        />
+      )}
+
+      <div className="flex h-full">
+        {/* Left message area */}
+        <div className={`flex flex-col transition-all duration-300 ${showThinkPanel ? 'w-1/2' : 'w-full'}`}>
         {/* Toggle button */}
         <div className="flex justify-between items-center p-4 border-b border-neutral-800 flex-shrink-0">
           <h3 className="text-lg font-medium text-white">Conversation</h3>
@@ -447,15 +493,28 @@ export function ChatMessagesView({
         </div>
       </div>
 
-      {/* Right think panel - fixed height, independent scrolling */}
+      {/* Right panel - progress tracker or think panel */}
       {showThinkPanel && (
         <div className="w-1/2 border-l border-neutral-800 flex flex-col h-full">
-          <ResearchThinkPanel 
-            researchData={researchData}
-            isLoading={isLoading}
-          />
+          {/* Show progress tracker if there are progress events, otherwise show think panel */}
+          {progressEvents.length > 0 || isLoading ? (
+            <div className="p-4 h-full overflow-auto">
+              <ProgressTracker 
+                progressEvents={progressEvents}
+                currentStatus={currentStatus}
+                onStop={onStop}
+                isStoppable={isLoading && currentStatus?.status !== "cancelled"}
+              />
+            </div>
+          ) : (
+            <ResearchThinkPanel 
+              researchData={researchData}
+              isLoading={isLoading}
+            />
+          )}
         </div>
       )}
-    </div>
+      </div>
+    </>
   );
 }

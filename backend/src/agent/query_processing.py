@@ -93,31 +93,43 @@ def should_ask_for_use_case(state: OverallState, config: RunnableConfig) -> bool
 
 
 def human_ask_for_use_case(state: OverallState, config: RunnableConfig) -> dict:
-    use_cases = state.get("query_tips", {}).get("potential_use_cases_to_clarify", [])
-    question = "Please describe the use case for your product. You can choose from the following examples or provide your own:\n"
-    for i, use_case in enumerate(use_cases):
-        question += f"{i + 1}. {use_case}\n"
+    # Check if we already have a human answer to process
+    if state.get("human_answer"):
+        answer = state.get("human_answer")
+        question = state.get("human_question", "")
+        
+        instruction = """ given the question and the answer, return the selected use case. Just the use case, no other text.
+        Question: {question}
+        Answer: {answer}"""
+        formatted_prompt = instruction.format(
+            question=question,
+            answer=answer
+        )
+        selected_use_case = get_llm("use_case_selection").invoke(formatted_prompt).content.strip()
 
-    answer = interrupt(question)
+        print("Selected use case:", selected_use_case)
 
-    instruction = """ given the question and the answer, return the selected use case. Just the use case, no other text.
-    Question: {question}
-    Answer: {answer}"""
-    formatted_prompt = instruction.format(
-        question=question,
-        answer=answer
-    )
-    selected_use_case = get_llm("use_case_selection").invoke(formatted_prompt).content.strip()
-
-    print("Selected use case:", selected_use_case)
-
-    return {
+        return {
             "query_breakdown": {
                 "product": state.get("query_breakdown", {}).get("product", ""),
                 "use_case": selected_use_case,
                 "conditions": state.get("query_breakdown", {}).get("conditions", ""),
                 "other": state.get("query_breakdown", {}).get("other", "")
-            }
+            },
+            "human_question": None,
+            "human_answer": None,
+            "awaiting_human": False
+        }
+    
+    # First time - prepare question for human
+    use_cases = state.get("query_tips", {}).get("potential_use_cases_to_clarify", [])
+    question = "Please describe the use case for your product. You can choose from the following examples or provide your own:\n"
+    for i, use_case in enumerate(use_cases):
+        question += f"{i + 1}. {use_case}\n"
+
+    return {
+        "human_question": question,
+        "awaiting_human": True
     }
 
 
