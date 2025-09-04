@@ -1,7 +1,13 @@
-# mypy: disable - error - code = "no-untyped-def,misc"
+"""
+FastAPI Application - Thin Controllers Only
+
+Clean separation of concerns following Domain Driven Design.
+Controllers handle only HTTP concerns, business logic delegated to services.
+"""
+
 import pathlib
-import json
-import uuid
+import asyncio
+from contextlib import asynccontextmanager
 from datetime import datetime
 from typing import Dict, Any, Optional
 
@@ -11,44 +17,26 @@ from fastapi.responses import StreamingResponse, FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import fastapi.exceptions
-import asyncio
-from contextlib import asynccontextmanager
 
-# Import our graph and configuration functions
-from agent.graph.graph_v2 import (
-    graph
-)
-from agent.graph.state_V2 import OverallState
-from agent.tracing.graph_wrapper import create_tracked_executor
-from agent.tracing.node_progress import cleanup_progress
-from agent.api.streaming_api import JobProgressStreamer
+# Infrastructure - DI Container
+from agent.infrastructure.service_container import ServiceContainer
 from agent.tracing import configure_tracing, get_tracer, add_span_attribute, add_span_event
 
-# Request/Response models
+
+# Request/Response DTOs
 class ProductSearchRequest(BaseModel):
     query: str
     effort: str = "medium"  # "low", "medium", "high"
+
 
 class HumanResponse(BaseModel):
     job_id: str
     answer: str
 
-class StreamEvent(BaseModel):
-    event: str
-    data: Dict[str, Any]
-    timestamp: str
 
-# Global state to track running jobs
-running_jobs: Dict[str, Dict[str, Any]] = {}
+# Initialize dependency injection container
+container = ServiceContainer()
 
-# Global state to track active job cancellation events
-active_job_events: Dict[str, asyncio.Event] = {}
-
-# Create tracked executor for progress monitoring  
-tracked_graph = create_tracked_executor(graph, "product-search-main")
-
-# Initialize progress streamer
-progress_streamer = JobProgressStreamer(running_jobs)
 
 # Define the FastAPI app with lifespan
 @asynccontextmanager
@@ -58,6 +46,7 @@ async def lifespan(app: FastAPI):
     yield
     # Shutdown
     print("[API] Product Search API shutting down...")
+
 
 app = FastAPI(lifespan=lifespan)
 
@@ -73,14 +62,11 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Add main section for running with uvicorn
-if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
 
-# Health check endpoint
+# REST Endpoints - Thin Controllers Only
 @app.get("/api/health")
 async def health_check():
+    """Health check endpoint"""
     with tracer.start_as_current_span("health_check"):
         add_span_attribute("endpoint", "/api/health")
         return {"status": "healthy", "timestamp": datetime.now().isoformat()}
@@ -88,54 +74,113 @@ async def health_check():
 
 @app.post("/api/search")
 async def start_product_search(request: ProductSearchRequest):
-    """
-    Start a product search and return a job ID for streaming updates.
-    """
+    """Start a product search and return a job ID for streaming updates."""
     with tracer.start_as_current_span("start_product_search"):
-        job_id = str(uuid.uuid4())
-        
-        add_span_attribute("job_id", job_id)
         add_span_attribute("query", request.query)
         add_span_attribute("effort", request.effort)
         
-        # Store job info
-        running_jobs[job_id] = {
-            "status": "starting",
-            "query": request.query,
-            "start_time": datetime.now().isoformat(),
-            "html_file_path": None,
-            "error": None
-        }
-        
-        # Start the graph execution in background
-        asyncio.create_task(run_graph_async(job_id, request))
-        
-        add_span_event("job_started", {"job_id": job_id})
-        return {"job_id": job_id, "status": "started"}
+        try:
+            # Delegate to service layer
+            job_id = await container.search_job_service.start_search_job(
+                request.query, 
+                request.effort
+            )
+            
+            # Start async search execution  
+            asyncio.create_task(
+                _execute_search_background(job_id, request.query, request.effort)
+            )
+            
+            add_span_event("job_started", {"job_id": job_id})
+            return {"job_id": job_id, "status": "started"}
+            
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Failed to start search: {str(e)}")
 
 
 @app.get("/api/search/{job_id}/stream")
 async def stream_search_progress(job_id: str):
-    """Stream progress updates for a running search job. Clean business logic only."""
-    if job_id not in running_jobs:
-        raise HTTPException(status_code=404, detail="Job not found")
-    
-    return StreamingResponse(
-        progress_streamer.stream_job_progress(job_id),
-        media_type="text/plain",
-        headers={
-            "Cache-Control": "no-cache",
-            "Connection": "keep-alive",
-            "Content-Type": "text/event-stream"
-        }
-    )
+    """Stream progress updates for a running search job."""
+    try:
+        # Check if job exists
+        job_data = await container.search_job_service.get_job_status(job_id)
+        if not job_data:
+            raise HTTPException(status_code=404, detail="Job not found")
+        
+        # Delegate streaming to service layer
+        return StreamingResponse(
+            container.progress_streaming_service.stream_job_progress(job_id),
+            media_type="text/plain",
+            headers={
+                "Cache-Control": "no-cache",
+                "Connection": "keep-alive",
+                "Content-Type": "text/event-stream"
+            }
+        )
+        
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Streaming failed: {str(e)}")
+
+
+@app.get("/api/search/{job_id}/status")
+async def get_search_status(job_id: str):
+    """Get the current status of a search job."""
+    try:
+        job_status = await container.search_job_service.get_job_status(job_id)
+        if not job_status:
+            raise HTTPException(status_code=404, detail="Job not found")
+        
+        return job_status
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to get status: {str(e)}")
+
+
+@app.post("/api/search/{job_id}/stop") 
+async def stop_search_job(job_id: str):
+    """Stop a running search job."""
+    try:
+        # Delegate to service layer
+        result = await container.search_job_service.cancel_job(job_id)
+        return result
+        
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to stop job: {str(e)}")
+
+
+@app.post("/api/human-response")
+async def submit_human_response(response: HumanResponse):
+    """Submit a human response to continue graph execution."""
+    try:
+        # Delegate to service layer
+        result = await container.search_job_service.submit_human_response(
+            response.job_id, 
+            response.answer
+        )
+        
+        # Start background task to resume search
+        asyncio.create_task(
+            container.product_search_service.resume_search_with_human_input(
+                response.job_id, 
+                response.answer
+            )
+        )
+        
+        return result
+        
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to submit response: {str(e)}")
 
 
 @app.get("/api/results/{filename}")
 async def serve_html_result(filename: str):
-    """
-    Serve the generated HTML results file.
-    """
+    """Serve the generated HTML results file."""
     file_path = pathlib.Path("results") / filename
     
     if not file_path.exists() or not file_path.is_file():
@@ -148,204 +193,60 @@ async def serve_html_result(filename: str):
     )
 
 
-@app.get("/api/search/{job_id}/status")
-async def get_search_status(job_id: str):
-    """
-    Get the current status of a search job.
-    """
-    if job_id not in running_jobs:
-        raise HTTPException(status_code=404, detail="Job not found")
-    
-    return running_jobs[job_id]
-
-
-@app.post("/api/human-response")
-async def submit_human_response(response: HumanResponse):
-    """
-    Submit a human response to continue graph execution.
-    """
-    job_id = response.job_id
-    
-    if job_id not in running_jobs:
-        raise HTTPException(status_code=404, detail="Job not found")
-    
-    job_info = running_jobs[job_id]
-    
-    if not job_info.get("awaiting_human"):
-        raise HTTPException(status_code=400, detail="Job is not awaiting human input")
-    
-    # Store the human answer and clear the awaiting flag
-    job_info["human_answer"] = response.answer
-    job_info["awaiting_human"] = False
-    
-    # Resume graph execution by triggering the resume logic
-    asyncio.create_task(resume_graph_with_human_input(job_id, response.answer))
-    
-    return {"status": "response_received", "job_id": job_id}
-
-
-@app.post("/api/search/{job_id}/stop")
-async def stop_search_job(job_id: str):
-    """
-    Stop a running search job.
-    """
-    if job_id not in running_jobs:
-        raise HTTPException(status_code=404, detail="Job not found")
-    
-    job_info = running_jobs[job_id]
-    
-    # Check if job is already completed or failed
-    if job_info["status"] in ["completed", "failed", "cancelled"]:
-        return {"status": "already_finished", "job_id": job_id, "current_status": job_info["status"]}
-    
-    # Trigger cancellation event if graph is actively running
-    if job_id in active_job_events:
-        print(f"[CANCELLATION] Triggering stop event for job {job_id}")
-        active_job_events[job_id].set()  # This will stop the graph execution
-        
-        # The graph will update the status to cancelled when it detects the event
-        # But we also update it here for immediate feedback
-        job_info["status"] = "cancelled"
-        job_info["end_time"] = datetime.now().isoformat()
-        job_info["cancelled_by_user"] = True
-        
-        return {"status": "cancelling", "job_id": job_id, "message": "Cancellation signal sent"}
-    else:
-        # Job is not actively running, just mark as cancelled
-        job_info["status"] = "cancelled"
-        job_info["end_time"] = datetime.now().isoformat()
-        job_info["cancelled_by_user"] = True
-        
-        return {"status": "cancelled", "job_id": job_id, "message": "Job marked as cancelled"}
-
-
-async def resume_graph_with_human_input(job_id: str, human_answer: str):
-    """
-    Resume graph execution after receiving human input.
-    """
+# Background task helpers
+async def _execute_search_background(job_id: str, query: str, effort: str):
+    """Execute search in background with proper error handling"""
     try:
-        job_info = running_jobs[job_id]
-        current_state = job_info.get("current_state")
+        # Set job as active with cancellation support
+        await container.search_job_service.set_job_active(job_id)
         
-        if not current_state:
-            raise ValueError("No saved state found for resuming")
-        
-        # Update state with human answer
-        current_state["human_answer"] = human_answer
-        current_state["awaiting_human"] = False
-        
-        config = {"configurable": {"thread_id": job_id}}
-        
-        # Resume from human_ask_for_use_case node
-        job_info["status"] = "resuming_after_human_input"
-        
-        # Continue graph execution with progress tracking
-        result_state = tracked_graph.invoke(current_state, config, job_id)
-        
-        # Check if HTML was generated
-        html_file_path = result_state.get("html_file_path")
-        if html_file_path:
-            # Extract just the filename for the API
-            filename = pathlib.Path(html_file_path).name
-            job_info["html_file_path"] = filename
-        
-        job_info["status"] = "completed"
-        job_info["end_time"] = datetime.now().isoformat()
+        # Delegate to service layer
+        await container.product_search_service.execute_search(job_id, query, effort)
         
     except Exception as e:
-        running_jobs[job_id]["status"] = "failed"
-        running_jobs[job_id]["error"] = str(e)
-        running_jobs[job_id]["end_time"] = datetime.now().isoformat()
-        print(f"❌ Graph resume failed for job {job_id}: {e}")
+        print(f"[API] Background search failed for job {job_id}: {e}")
+        await container.search_job_service.mark_job_failed(job_id, str(e))
+    finally:
+        # Cleanup
+        await container.search_job_service.set_job_inactive(job_id)
 
 
-async def cleanup_progress_after_delay(job_id: str):
-    """Clean up progress tracking data after a delay to allow frontend to fetch final events"""
-    await asyncio.sleep(30)  # Wait 30 seconds before cleanup
-    cleanup_progress(job_id)
+# Frontend serving logic (unchanged)
+def create_frontend_router(build_dir="../frontend/dist"):
+    """Creates a router to serve the React frontend."""
+    build_path = pathlib.Path(__file__).parent.parent.parent / build_dir
+    static_files_path = build_path / "assets"
+
+    if not build_path.is_dir() or not (build_path / "index.html").is_file():
+        print(f"WARN: Frontend build directory not found at {build_path}")
+        from starlette.routing import Route
+        
+        async def dummy_frontend(request):
+            return Response(
+                "Frontend not built. Run 'npm run build' in the frontend directory.",
+                media_type="text/plain",
+                status_code=503,
+            )
+        return Route("/{path:path}", endpoint=dummy_frontend)
+
+    react = FastAPI(openapi_url="")
+    react.mount("/assets", StaticFiles(directory=static_files_path), name="static_assets")
+
+    @react.get("/{path:path}")
+    async def handle_catch_all(request: Request, path: str):
+        fp = build_path / path
+        if not fp.exists() or not fp.is_file():
+            fp = build_path / "index.html"
+        return fastapi.responses.FileResponse(fp)
+
+    return react
 
 
+# Mount the frontend
+app.mount("/app", create_frontend_router(), name="frontend")
 
-async def run_graph_async(job_id: str, request: ProductSearchRequest):
-    """
-    Run the graph asynchronously and update job status.
-    """
-    try:
-        print("API", f"Starting graph execution for job {job_id}", job_id)
-        print("API", f"Query: {request.query}", job_id)
-        
-        # Check if job was cancelled before starting
-        if running_jobs[job_id]["status"] == "cancelled":
-            print("API", f"Job {job_id} was cancelled before starting", job_id)
-            return
-            
-        # Update status
-        running_jobs[job_id]["status"] = "initializing"
-        
-        # Prepare initial state with effort parameter - graph will configure limits internally
-        initial_state = OverallState(
-            user_query=request.query,
-            effort=request.effort,
-        )
-        
-        config = {"configurable": {"thread_id": job_id}}
-        
-        
-        # Check for cancellation before executing graph
-        if running_jobs[job_id]["status"] == "cancelled":
-            print("API", f"Job {job_id} was cancelled before graph execution", job_id)
-            return
-            
-        # Create cancellation event for this job
-        stop_event = asyncio.Event()
-        active_job_events[job_id] = stop_event
-        
-        print("API", f"Starting tracked graph execution for job {job_id}", job_id)
-        
-        # Execute graph with cancellation support
-        result_state = None
-        try:
-            # Use astream to get chunks and check for cancellation
-            last_chunk = None
-            async for chunk in tracked_graph.astream(initial_state, config, job_id):
-                # Check if cancellation was requested
-                if stop_event.is_set():
-                    print("API", f"Graph execution cancelled for job {job_id}", job_id)
-                    running_jobs[job_id]["status"] = "cancelled"
-                    running_jobs[job_id]["end_time"] = datetime.now().isoformat()
-                    return
-                
-                last_chunk = chunk
-            
-            result_state = last_chunk
-        finally:
-            # Clean up the stop event
-            if job_id in active_job_events:
-                del active_job_events[job_id]
-        
-        print("API", f"Graph execution completed for job {job_id}", job_id)
-        print("API", f"Result state keys: {list(result_state.keys()) if result_state else 'None'}", job_id)
-        
-        # Check if human input is needed
-        if result_state.get("awaiting_human") and result_state.get("human_question"):
-            running_jobs[job_id]["status"] = "awaiting_human_input"
-            running_jobs[job_id]["awaiting_human"] = True
-            running_jobs[job_id]["human_question"] = result_state["human_question"]
-            running_jobs[job_id]["current_state"] = result_state
-            return  # Wait for human response
-        
-        # Check if HTML was generated
-        html_file_path = result_state.get("html_file_path")
-        if html_file_path:
-            # Extract just the filename for the API
-            filename = pathlib.Path(html_file_path).name
-            running_jobs[job_id]["html_file_path"] = filename
-        
-        running_jobs[job_id]["status"] = "completed"
-        running_jobs[job_id]["end_time"] = datetime.now().isoformat()
-        
-    except Exception as e:
-        running_jobs[job_id]["status"] = "failed"
-        running_jobs[job_id]["error"] = str(e)
-        running_jobs[job_id]["end_time"] = datetime.now().isoformat()
-        print(f"❌ Graph execution failed for job {job_id}: {e}")
+
+# Main entry point
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8000)

@@ -1,14 +1,17 @@
 """
-Clean streaming API for frontend progress updates.
-Pure business logic, no tracing/debugging concerns.
+Progress Streaming Service
+
+Handles streaming of job progress events to the frontend.
+Clean separation from API layer - focuses purely on business logic of streaming.
 """
 
 import asyncio
-from typing import Dict, Any, Optional, AsyncGenerator
+from typing import AsyncGenerator, Dict, Any, Optional
 from datetime import datetime
 from pydantic import BaseModel
 
-from agent.tracing.node_progress import get_progress_events, NodeEvent
+from agent.domain.repositories.job_repository import JobRepository
+from agent.tracing.node_progress import get_progress_events
 
 
 class StreamEvent(BaseModel):
@@ -18,25 +21,31 @@ class StreamEvent(BaseModel):
     timestamp: str
 
 
-class JobProgressStreamer:
-    """Clean job progress streaming for frontend"""
+class ProgressStreamingService:
+    """Service responsible for streaming job progress to clients"""
     
-    def __init__(self, running_jobs: Dict[str, Dict[str, Any]]):
-        self.running_jobs = running_jobs
+    def __init__(self, job_repository: JobRepository):
+        self.job_repository = job_repository
     
     async def stream_job_progress(self, job_id: str) -> AsyncGenerator[str, None]:
         """
-        Stream job progress events to frontend.
-        Clean business logic only - no debug/trace pollution.
+        Stream progress events for a job
+        
+        Args:
+            job_id: Job to stream progress for
+            
+        Yields:
+            Server-sent event strings for the frontend
         """
-        if job_id not in self.running_jobs:
+        # Check if job exists
+        if not await self.job_repository.job_exists(job_id):
             return
         
         last_event_timestamp = None
         
         while True:
-            job_info = self.running_jobs.get(job_id)
-            if not job_info:
+            job_data = await self.job_repository.get_job(job_id)
+            if not job_data:
                 break
             
             # Get new progress events
@@ -57,20 +66,20 @@ class JobProgressStreamer:
                 last_event_timestamp = event.timestamp
             
             # Handle human input requirement
-            if job_info.get("awaiting_human") and job_info.get("human_question"):
-                async for human_event in self._handle_human_input_streaming(job_id, job_info):
+            if job_data.get("awaiting_human") and job_data.get("human_question"):
+                async for human_event in self._handle_human_input_streaming(job_id, job_data):
                     yield human_event
                 continue
             
             # Check if job is complete - only send completion event with results
-            if job_info["status"] in ["completed", "failed", "cancelled"]:
+            if job_data["status"] in ["completed", "failed", "cancelled"]:
                 final_event = StreamEvent(
                     event="job_complete",
                     data={
-                        "status": job_info["status"],
-                        "html_file_path": job_info.get("html_file_path"),
-                        "error": job_info.get("error"),
-                        "cancelled_by_user": job_info.get("cancelled_by_user", False)
+                        "status": job_data["status"],
+                        "html_file_path": job_data.get("html_file_path"),
+                        "error": job_data.get("error"),
+                        "cancelled_by_user": job_data.get("cancelled_by_user", False)
                     },
                     timestamp=datetime.now().isoformat()
                 )
@@ -79,22 +88,22 @@ class JobProgressStreamer:
             
             await asyncio.sleep(0.5)  # Fast polling for responsive UI
     
-    async def _handle_human_input_streaming(self, job_id: str, job_info: Dict[str, Any]) -> AsyncGenerator[str, None]:
+    async def _handle_human_input_streaming(self, job_id: str, job_data: Dict[str, Any]) -> AsyncGenerator[str, None]:
         """Handle human input requirement streaming"""
         human_event = StreamEvent(
             event="human_input_required",
             data={
                 "status": "awaiting_human_input",
-                "question": job_info["human_question"],
-                "query": job_info["query"]
+                "question": job_data["human_question"],
+                "query": job_data["query"]
             },
             timestamp=datetime.now().isoformat()
         )
         yield f"data: {human_event.model_dump_json()}\n\n"
         
         # Wait for human response
-        while job_info.get("awaiting_human", False):
+        while job_data.get("awaiting_human", False):
             await asyncio.sleep(1)
-            job_info = self.running_jobs.get(job_id)
-            if not job_info:
+            job_data = await self.job_repository.get_job(job_id)
+            if not job_data:
                 break
