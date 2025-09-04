@@ -1,6 +1,7 @@
 import os
 from dotenv import load_dotenv
 from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain_google_vertexai	import ChatVertexAI
 from langchain_groq import ChatGroq
 from langchain_core.rate_limiters import InMemoryRateLimiter
 from langchain.globals import set_debug
@@ -26,7 +27,7 @@ rate_limiter = InMemoryRateLimiter(
 #    max_retries=10,
 #)
 
-FAST_MODEL = ChatGoogleGenerativeAI(
+FAST_MODEL = ChatVertexAI(
     model="gemini-2.0-flash-lite",
     temperature=0,
     max_tokens=None,
@@ -35,7 +36,7 @@ FAST_MODEL = ChatGoogleGenerativeAI(
 #    rate_limiter=rate_limiter,
 )
 
-BALANCED_MODEL = ChatGoogleGenerativeAI(
+BALANCED_MODEL = ChatVertexAI(
     model="gemini-2.0-flash-lite",
     temperature=0,
     max_tokens=None,
@@ -45,7 +46,7 @@ BALANCED_MODEL = ChatGoogleGenerativeAI(
 )
 
 
-SMART_MODEL = ChatGoogleGenerativeAI(
+SMART_MODEL = ChatVertexAI(
     model="gemini-2.5-flash",
     temperature=0,
     max_tokens=None,
@@ -53,7 +54,7 @@ SMART_MODEL = ChatGoogleGenerativeAI(
 #    rate_limiter=rate_limiter,
 )
 
-CREATIVE_MODEL =  ChatGoogleGenerativeAI(
+CREATIVE_MODEL =  ChatVertexAI(
     model="gemini-2.0-flash-lite",
     temperature=0.3,
     max_tokens=None,
