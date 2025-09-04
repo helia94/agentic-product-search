@@ -9,9 +9,11 @@ import json
 from datetime import datetime
 from typing import List, Dict, Any
 from unittest.mock import Mock, patch
+import os, sys
+sys.path.append(os.path.join(os.path.dirname(__file__), "..", ".."))
 
-from agent.node_progress import NodeEvent, track_node_progress, get_progress_events, cleanup_progress
-from agent.streaming_api import JobProgressStreamer, StreamEvent
+from agent.tracing.node_progress import NodeEvent, track_node_progress, get_progress_events, cleanup_progress
+from agent.api.streaming_api import JobProgressStreamer, StreamEvent
 
 
 class TestNodeProgressTracking:

@@ -5,7 +5,7 @@ This shows how to set up centralized search limits that work consistently
 across all search patterns and loops.
 """
 
-from agent.search_limits import configure_search_limits_from_main_graph, ComponentNames
+from agent.configuration.search_limits import configure_search_limits_from_main_graph, ComponentNames
 
 def configure_search_limits_for_product_search():
     """
@@ -81,11 +81,11 @@ def configure_thorough_search_limits():
 # Usage examples:
 
 # In graph_v2.py, at the beginning of main execution:
-# from agent.search_limits_example import configure_search_limits_for_product_search
+# from agent.configuration.search_limits_example import configure_search_limits_for_product_search
 # configure_search_limits_for_product_search()
 
 # When creating search configs with loop numbers:
-# from agent.search_pattern import create_product_research_config
+# from agent.graph.search_pattern import create_product_research_config
 # 
 # # For different loops in the same workflow:
 # config_loop1 = create_product_research_config(loop_number=1)  # Uses loop 1 limits

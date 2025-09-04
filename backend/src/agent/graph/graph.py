@@ -5,7 +5,7 @@
 # If you need the full research graph functionality, 
 # please restore from version control or recreate as needed.
 
-from agent.citation_utils import (
+from agent.utils.citation_utils import (
     get_citations,
     insert_citation_markers,
     resolve_urls,

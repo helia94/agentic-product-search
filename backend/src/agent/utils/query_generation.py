@@ -1,9 +1,9 @@
 from langchain_core.runnables import RunnableConfig
 
-from agent.state_V2 import OverallState, Queries
+from agent.graph.state_V2 import OverallState, Queries
 from agent.configuration import Configuration
-from agent.llm_setup import get_llm
-from agent.search_limits import get_max_explore_queries
+from agent.configuration.llm_setup import get_llm
+from agent.configuration.search_limits import get_max_explore_queries
 
 
 def query_generator(state: OverallState, config: RunnableConfig) -> OverallState:

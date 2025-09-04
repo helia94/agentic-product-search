@@ -4,9 +4,9 @@ from typing import List
 from datetime import datetime
 from pydantic import BaseModel, Field
 
-from agent.state_V2 import OverallState
-from agent.llm_setup import get_llm
-from agent.search_limits import get_max_research_products
+from agent.graph.state_V2 import OverallState
+from agent.configuration.llm_setup import get_llm
+from agent.configuration.search_limits import get_max_research_products
 
 
 def save_results_to_disk(state: OverallState) -> OverallState:

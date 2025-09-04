@@ -1,9 +1,9 @@
 import json
 
-from agent.state_V2 import OverallState
-from agent.explore_agent_graph import graph_explore
-from agent.final_info_graph import final_info_graph
-from agent.search_limits import get_max_explore_products, get_max_research_products
+from agent.graph.state_V2 import OverallState
+from agent.graph.explore_agent_graph import graph_explore
+from agent.graph.final_info_graph import final_info_graph
+from agent.configuration.search_limits import get_max_explore_products, get_max_research_products
 
 
 def call_product_search_graph(state: OverallState) -> OverallState:
