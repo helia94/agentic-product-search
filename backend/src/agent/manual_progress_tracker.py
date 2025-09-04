@@ -31,7 +31,16 @@ def track_progress(node_name: str, graph_name: str = "main"):
             track_node_start(job_id, node_name, graph_name)
             
             try:
-                result = func(state, config)
+                # Check function signature to determine if it accepts config
+                import inspect
+                sig = inspect.signature(func)
+                
+                if len(sig.parameters) > 1:
+                    # Function accepts both state and config
+                    result = func(state, config)
+                else:
+                    # Function only accepts state
+                    result = func(state)
                 print(f"✅ [MANUAL_TRACK] Completed {node_name} for job {job_id}")
                 track_node_end(job_id, node_name, graph_name)
                 return result
