@@ -10,14 +10,14 @@ from langgraph.types import Command
 from langgraph.checkpoint.sqlite import SqliteSaver
 
 from agent.graph.state_V2 import OverallState
-from agent.utils.query_processing import (
+from agent.graph.query_processing import (
     pars_query, enrich_query, should_ask_for_use_case, 
     human_ask_for_use_case, find_criteria
 )
-from agent.utils.query_generation import query_generator
+from agent.graph.query_generation import query_generator
 from agent.graph.product_orchestration import call_product_search_graph, complete_product_info
 from agent.utils.result_processing import save_results_to_disk, select_final_products
-from agent.utils.html_generation import generate_html_results
+from agent.graph.html_generation import generate_html_results
 from agent.configuration import Configuration
 from agent.configuration.search_limits import initialize_graph_with_search_limits
 

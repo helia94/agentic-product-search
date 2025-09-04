@@ -5,7 +5,7 @@ from langchain_core.runnables import RunnableConfig
 
 from agent.graph.state_V2 import OverallState
 from agent.configuration.llm_setup import get_llm
-from agent.utils.html_generation_prompt import HTML_GENERATION_PROMPT
+from agent.graph.html_generation_prompt import HTML_GENERATION_PROMPT
 
 
 def generate_html_results(state: OverallState, config: RunnableConfig) -> OverallState:
