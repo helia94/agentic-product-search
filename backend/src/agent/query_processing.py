@@ -5,8 +5,10 @@ from langgraph.types import interrupt
 from agent.state_V2 import OverallState, QueryBreakDown, QueryTips, Criteria
 from agent.configuration import Configuration
 from agent.llm_setup import get_llm
+from agent.node_progress import track_node_progress
 
 
+@track_node_progress("pars_query")
 def pars_query(state: OverallState, config: RunnableConfig) -> OverallState:
     configurable = Configuration.from_runnable_config(config)
 
