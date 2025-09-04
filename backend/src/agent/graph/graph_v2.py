@@ -1,13 +1,12 @@
 import os
 import json
-import sqlite3
 from typing import List
 from datetime import datetime
 
 from langgraph.graph import StateGraph
 from langgraph.graph import START, END
 from langgraph.types import Command
-from langgraph.checkpoint.sqlite import SqliteSaver
+from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
 
 from agent.graph.state_V2 import OverallState
 from agent.graph.query_processing import (
@@ -66,11 +65,8 @@ builder.add_edge("save_results_to_disk", "generate_html_results")
 builder.add_edge("generate_html_results", END)
 
 
-# Create persistent SQLite checkpointer 
-checkpointer = SqliteSaver(sqlite3.connect("checkpoints.db", check_same_thread=False))
-
-# Compile the graph
-graph = builder.compile(name="product-search-agent", checkpointer=checkpointer)
+# For now, compile without checkpointer - we'll handle checkpointing in the execution layer
+graph = builder.compile(name="product-search-agent")
 
 
 

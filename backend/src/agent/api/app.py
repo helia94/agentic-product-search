@@ -41,6 +41,9 @@ class StreamEvent(BaseModel):
 # Global state to track running jobs
 running_jobs: Dict[str, Dict[str, Any]] = {}
 
+# Global state to track active job cancellation events
+active_job_events: Dict[str, asyncio.Event] = {}
+
 # Create tracked executor for progress monitoring  
 tracked_graph = create_tracked_executor(graph, "product-search-main")
 
@@ -195,16 +198,25 @@ async def stop_search_job(job_id: str):
     if job_info["status"] in ["completed", "failed", "cancelled"]:
         return {"status": "already_finished", "job_id": job_id, "current_status": job_info["status"]}
     
-    # Mark the job as cancelled
-    job_info["status"] = "cancelled"
-    job_info["end_time"] = datetime.now().isoformat()
-    job_info["cancelled_by_user"] = True
-    
-    # Note: The actual graph execution can't be easily interrupted mid-execution
-    # since it's running synchronously, but we mark it as cancelled so the
-    # streaming API knows to stop and the frontend can show the cancelled state
-    
-    return {"status": "cancelled", "job_id": job_id}
+    # Trigger cancellation event if graph is actively running
+    if job_id in active_job_events:
+        print(f"[CANCELLATION] Triggering stop event for job {job_id}")
+        active_job_events[job_id].set()  # This will stop the graph execution
+        
+        # The graph will update the status to cancelled when it detects the event
+        # But we also update it here for immediate feedback
+        job_info["status"] = "cancelled"
+        job_info["end_time"] = datetime.now().isoformat()
+        job_info["cancelled_by_user"] = True
+        
+        return {"status": "cancelling", "job_id": job_id, "message": "Cancellation signal sent"}
+    else:
+        # Job is not actively running, just mark as cancelled
+        job_info["status"] = "cancelled"
+        job_info["end_time"] = datetime.now().isoformat()
+        job_info["cancelled_by_user"] = True
+        
+        return {"status": "cancelled", "job_id": job_id, "message": "Job marked as cancelled"}
 
 
 async def resume_graph_with_human_input(job_id: str, human_answer: str):
@@ -296,9 +308,33 @@ async def run_graph_async(job_id: str, request: ProductSearchRequest):
             print("API", f"Job {job_id} was cancelled before graph execution", job_id)
             return
             
+        # Create cancellation event for this job
+        stop_event = asyncio.Event()
+        active_job_events[job_id] = stop_event
+        
         print("API", f"Starting tracked graph execution for job {job_id}", job_id)
-        # Execute graph with progress tracking
-        result_state = tracked_graph.invoke(initial_state, config, job_id)
+        
+        # Execute graph with cancellation support
+        result_state = None
+        try:
+            # Use astream to get chunks and check for cancellation
+            last_chunk = None
+            async for chunk in tracked_graph.astream(initial_state, config, job_id):
+                # Check if cancellation was requested
+                if stop_event.is_set():
+                    print("API", f"Graph execution cancelled for job {job_id}", job_id)
+                    running_jobs[job_id]["status"] = "cancelled"
+                    running_jobs[job_id]["end_time"] = datetime.now().isoformat()
+                    return
+                
+                last_chunk = chunk
+            
+            result_state = last_chunk
+        finally:
+            # Clean up the stop event
+            if job_id in active_job_events:
+                del active_job_events[job_id]
+        
         print("API", f"Graph execution completed for job {job_id}", job_id)
         print("API", f"Result state keys: {list(result_state.keys()) if result_state else 'None'}", job_id)
         
