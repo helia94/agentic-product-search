@@ -40,6 +40,7 @@ def pars_query(state: OverallState, config: RunnableConfig) -> OverallState:
     }
 
 
+@track_node_progress("enrich_query")
 def enrich_query(state: OverallState, config: RunnableConfig) -> OverallState:
     configurable = Configuration.from_runnable_config(config)
 
@@ -94,6 +95,7 @@ def should_ask_for_use_case(state: OverallState, config: RunnableConfig) -> bool
     return len(use_cases) > 0
 
 
+@track_node_progress("human_ask_for_use_case")
 def human_ask_for_use_case(state: OverallState, config: RunnableConfig) -> dict:
     # Check if we already have a human answer to process
     if state.get("human_answer"):
@@ -135,6 +137,7 @@ def human_ask_for_use_case(state: OverallState, config: RunnableConfig) -> dict:
     }
 
 
+@track_node_progress("find_criteria")
 def find_criteria(state: OverallState, config: RunnableConfig) -> OverallState:
     configurable = Configuration.from_runnable_config(config)
 

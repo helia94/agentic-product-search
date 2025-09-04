@@ -4,8 +4,9 @@ from agent.graph.state_V2 import OverallState, Queries
 from agent.configuration import Configuration
 from agent.configuration.llm_setup import get_llm
 from agent.configuration.search_limits import get_max_explore_queries
+from agent.tracing.node_progress import track_node_progress
 
-
+@track_node_progress("query_generator")
 def query_generator(state: OverallState, config: RunnableConfig) -> OverallState:
     configurable = Configuration.from_runnable_config(config)
 

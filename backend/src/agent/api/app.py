@@ -290,18 +290,6 @@ async def run_graph_async(job_id: str, request: ProductSearchRequest):
         
         config = {"configurable": {"thread_id": job_id}}
         
-        # Track progress through graph nodes
-        node_updates = {
-            "pars_query": "parsing_query",
-            "enrich_query": "enriching_query",
-            "find_criteria": "finding_criteria", 
-            "query_generator": "generating_queries",
-            "call_product_search_graph": "searching_products",
-            "select_final_products": "selecting_products",
-            "complete_product_info": "completing_product_info",
-            "save_results_to_disk": "saving_results",
-            "generate_html_results": "generating_html"
-        }
         
         # Check for cancellation before executing graph
         if running_jobs[job_id]["status"] == "cancelled":

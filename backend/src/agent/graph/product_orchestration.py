@@ -4,9 +4,11 @@ from agent.graph.state_V2 import OverallState
 from agent.graph.explore_agent_graph import graph_explore
 from agent.graph.final_info_graph import final_info_graph
 from agent.configuration.search_limits import get_max_explore_products, get_max_research_products
+from agent.tracing.node_progress import track_node_progress
+from langchain_core.runnables import RunnableConfig
 
-
-def call_product_search_graph(state: OverallState) -> OverallState:
+@track_node_progress("call_product_search_graph")
+def call_product_search_graph(state: OverallState, config: RunnableConfig = None) -> OverallState:
     """
     Call the product search graph with the current state.
     This function is used to initiate the product search process.
@@ -32,8 +34,8 @@ def call_product_search_graph(state: OverallState) -> OverallState:
         "researched_products": exploration_state.get("research_results", []),
     }
 
-
-def complete_product_info(state: OverallState) -> OverallState:
+@track_node_progress("complete_product_info")
+def complete_product_info(state: OverallState, config: RunnableConfig = None) -> OverallState:
     """
     Complete missing ProductFull fields for selected products using final_info_graph.
     This happens after product selection to enrich the final chosen products.

@@ -7,9 +7,11 @@ from pydantic import BaseModel, Field
 from agent.graph.state_V2 import OverallState
 from agent.configuration.llm_setup import get_llm
 from agent.configuration.search_limits import get_max_research_products
+from agent.tracing.node_progress import track_node_progress
+from langchain_core.runnables import RunnableConfig
 
-
-def save_results_to_disk(state: OverallState) -> OverallState:
+@track_node_progress("save_results_to_disk")
+def save_results_to_disk(state: OverallState, config: RunnableConfig = None) -> OverallState:
     """
     Save the complete state and final product information to disk files.
     Creates timestamped files for both state and products.
@@ -61,8 +63,8 @@ def save_results_to_disk(state: OverallState) -> OverallState:
     # Return state unchanged (this is a side-effect only node)
     return state
 
-
-def select_final_products(state: OverallState) -> OverallState:
+@track_node_progress("select_final_products")
+def select_final_products(state: OverallState, config: RunnableConfig = None) -> OverallState:
     """
     Select the final products based on the researched products.
     This function is used to finalize the product selection process.
