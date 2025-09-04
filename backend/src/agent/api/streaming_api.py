@@ -62,20 +62,7 @@ class JobProgressStreamer:
                     yield human_event
                 continue
             
-            # Stream job status update
-            status_event = StreamEvent(
-                event="status_update",
-                data={
-                    "status": job_info["status"],
-                    "query": job_info["query"],
-                    "html_file_path": job_info.get("html_file_path"),
-                    "error": job_info.get("error")
-                },
-                timestamp=datetime.now().isoformat()
-            )
-            yield f"data: {status_event.model_dump_json()}\n\n"
-            
-            # Check if job is complete
+            # Check if job is complete - only send completion event with results
             if job_info["status"] in ["completed", "failed", "cancelled"]:
                 final_event = StreamEvent(
                     event="job_complete",
