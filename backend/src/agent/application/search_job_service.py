@@ -39,11 +39,21 @@ class SearchJobService:
         }
         
         await self.job_repository.save_job(job_id, job_data)
+        print(f"[SearchJobService] Created job {job_id} with data: {job_data}")
         return job_id
     
     async def get_job_status(self, job_id: str) -> Optional[Dict[str, Any]]:
         """Get current job status and data"""
-        return await self.job_repository.get_job(job_id)
+        print(f"[SearchJobService] Getting status for job {job_id}")
+        job_exists = await self.job_repository.job_exists(job_id)
+        print(f"[SearchJobService] Job exists: {job_exists}")
+        if job_exists:
+            job_data = await self.job_repository.get_job(job_id)
+            print(f"[SearchJobService] Job data: {job_data}")
+            return job_data
+        else:
+            print(f"[SearchJobService] Job {job_id} not found in repository")
+            return None
     
     async def cancel_job(self, job_id: str) -> Dict[str, Any]:
         """
