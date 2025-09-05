@@ -60,8 +60,11 @@ def save_results_to_disk(state: OverallState, config: RunnableConfig = None) -> 
     except Exception as e:
         print(f"❌ Error saving products: {e}")
     
-    # Return state unchanged (this is a side-effect only node)
-    return state
+    # Return minimal state update (this is a side-effect only node)
+    return {
+        "disk_save_completed": True,
+        "disk_save_timestamp": timestamp
+    }
 
 @track_node_progress("select_final_products")
 def select_final_products(state: OverallState, config: RunnableConfig = None) -> OverallState:
