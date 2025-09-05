@@ -68,7 +68,8 @@
       "Read(/C:\\Dev\\agentic-product-search\\backend\\src\\agent\\graph/**)",
       "Read(/C:\\Dev\\agentic-product-search\\backend\\src\\agent\\graph/**)",
       "Read(/C:\\Dev\\agentic-product-search\\backend\\src\\agent\\graph/**)",
-      "Read(/C:\\Dev\\agentic-product-search\\backend\\src\\agent\\graph/**)"
+      "Read(/C:\\Dev\\agentic-product-search\\backend\\src\\agent\\graph/**)",
+      "Read(/C:\\Dev\\agentic-product-search\\backend\\src\\agent\\infrastructure/**)"
     ],
     "deny": []
   }
