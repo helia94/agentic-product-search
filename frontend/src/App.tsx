@@ -122,25 +122,34 @@ function useSearchApi(): SearchState {
               
             case "job_complete":
               if (data.data.status === "completed") {
-                // Get the HTML result
-                const htmlFilePath = data.data.html_file_path;
-                if (htmlFilePath) {
-                  fetch(`${apiUrl}/api/results/${htmlFilePath}`)
-                    .then(res => res.text())
-                    .then(htmlContent => {
+                // Get job status to fetch HTML file path
+                fetch(`${apiUrl}/api/search/${currentJobId.current}/status`)
+                  .then(res => res.json())
+                  .then(jobStatus => {
+                    const htmlFilePath = jobStatus.html_file_path;
+                    if (htmlFilePath) {
+                      return fetch(`${apiUrl}/api/results/${htmlFilePath}`);
+                    }
+                    return null;
+                  })
+                  .then(res => res ? res.text() : null)
+                  .then(htmlContent => {
+                    if (htmlContent) {
                       const aiMessage: Message = {
                         type: "ai",
                         content: htmlContent,
                         id: Date.now().toString()
                       };
                       setMessages(prev => [...prev, aiMessage]);
-                      setIsLoading(false);
-                      eventSourceRef.current?.close();
-                    });
-                } else {
-                  setIsLoading(false);
-                  eventSourceRef.current?.close();
-                }
+                    }
+                    setIsLoading(false);
+                    eventSourceRef.current?.close();
+                  })
+                  .catch(error => {
+                    console.error("Failed to fetch results:", error);
+                    setIsLoading(false);
+                    eventSourceRef.current?.close();
+                  });
               } else if (data.data.status === "failed") {
                 setIsLoading(false);
                 setCurrentStatus(data.data as JobStatus);

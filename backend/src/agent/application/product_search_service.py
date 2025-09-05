@@ -66,10 +66,9 @@ class ProductSearchService:
             print(f"[SEARCH] Starting tracked graph execution for job {job_id}")
             
             # Execute graph with cancellation support
-            result_state = None
+            result_state = initial_state.copy()  # Start with initial state
             try:
                 # Use astream to get chunks and check for cancellation
-                last_chunk = None
                 async for chunk in self.tracked_graph.astream(initial_state, config, job_id):
                     # Check if cancellation was requested
                     if stop_event.is_set():
@@ -77,9 +76,9 @@ class ProductSearchService:
                         await self.job_repository.update_job_status(job_id, "cancelled")
                         return
                     
-                    last_chunk = chunk
-                
-                result_state = last_chunk
+                    # Accumulate the state from each chunk
+                    if chunk:
+                        result_state.update(chunk)
             finally:
                 # Clean up the stop event
                 await self.job_repository.remove_job_event(job_id)

@@ -77,7 +77,6 @@ class ProgressStreamingService:
                     event="job_complete",
                     data={
                         "status": job_data["status"],
-                        "html_file_path": job_data.get("html_file_path"),
                         "error": job_data.get("error"),
                         "cancelled_by_user": job_data.get("cancelled_by_user", False)
                     },

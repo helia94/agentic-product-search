@@ -16,7 +16,7 @@ import {
 interface NodeProgressEvent {
   event_type: "node_start" | "node_end" | "node_error" | "graph_start" | "graph_end";
   node_name: string;
-  graph_name: string;
+  graph_name?: string;
   duration_ms?: number;
   error?: string;
   metadata?: Record<string, any>;
@@ -99,7 +99,7 @@ export const ProgressTracker: React.FC<ProgressTrackerProps> = ({
 
   // Process events chronologically
   progressEvents.forEach(event => {
-    const key = `${event.graph_name}:${event.node_name}`;
+    const key = event.node_name;
     if (!nodeStates.has(key)) {
       nodeStates.set(key, { started: null, ended: null, error: null });
     }
@@ -141,10 +141,10 @@ export const ProgressTracker: React.FC<ProgressTrackerProps> = ({
     .sort((a, b) => {
       // Sort by timestamp of the first event for each node
       const aTime = a.event ? new Date(progressEvents.find(e => 
-        e.node_name === a.event.node_name && e.graph_name === a.event.graph_name
+        e.node_name === a.event.node_name
       )?.metadata?.timestamp || 0).getTime() : 0;
       const bTime = b.event ? new Date(progressEvents.find(e => 
-        e.node_name === b.event.node_name && e.graph_name === b.event.graph_name
+        e.node_name === b.event.node_name
       )?.metadata?.timestamp || 0).getTime() : 0;
       return aTime - bTime;
     });
@@ -218,7 +218,7 @@ export const ProgressTracker: React.FC<ProgressTrackerProps> = ({
                       )}
                     </div>
                     
-                    {event.graph_name !== 'main' && (
+                    {event.graph_name && event.graph_name !== 'main' && (
                       <div className="text-xs text-gray-500 truncate">
                         {event.graph_name}
                       </div>
