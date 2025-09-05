@@ -205,3 +205,7 @@ modify/
 backend/src/results/*
 results/*
 checkpoints.*
+llm_cache.*
+node_cache.*
+node_cache.*
+node_cache.*
