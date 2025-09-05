@@ -1,12 +1,10 @@
-import os
 import json
-from typing import List
-from datetime import datetime
+from pathlib import Path
 
 from langgraph.graph import StateGraph
 from langgraph.graph import START, END
-from langgraph.types import Command
-from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
+from langgraph.types import Command, CachePolicy, default_cache_key
+from langgraph.cache.sqlite import SqliteCache
 
 from agent.graph.state_V2 import OverallState
 from agent.graph.query_processing import (
@@ -25,21 +23,29 @@ from agent.configuration.search_limits import initialize_graph_with_search_limit
 
 
 # Create our Agent Graph
+cache = SqliteCache(path=str(Path(__file__).resolve().parent.parent.parent / "node_cache.sqlite"))
+
 builder = StateGraph(OverallState, config_schema=Configuration)
 
 
 
 # Add tracked nodes to the graph
-builder.add_node("pars_query", pars_query) 
-builder.add_node("enrich_query", enrich_query)
+# Helper to build cache keys from selected state fields
+def _key(*fields):
+    return lambda state: default_cache_key({f: state.get(f) for f in fields})
+
+TTL = 60 * 60 * 24  # 24 hours
+
+builder.add_node("pars_query", pars_query, cache_policy=CachePolicy(ttl=TTL, key_func=_key("user_query")))
+builder.add_node("enrich_query", enrich_query, cache_policy=CachePolicy(ttl=TTL, key_func=_key("user_query")))
 builder.add_node("human_ask_for_use_case", human_ask_for_use_case)
-builder.add_node("find_criteria", find_criteria)
-builder.add_node("query_generator", query_generator)
-builder.add_node("call_product_search_graph", call_product_search_graph)
-builder.add_node("complete_product_info", complete_product_info)
-builder.add_node("select_final_products", select_final_products)
+builder.add_node("find_criteria", find_criteria, cache_policy=CachePolicy(ttl=TTL, key_func=_key("user_query")))
+builder.add_node("query_generator", query_generator, cache_policy=CachePolicy(ttl=TTL, key_func=_key("user_query", "criteria")))
+builder.add_node("call_product_search_graph", call_product_search_graph, cache_policy=CachePolicy(ttl=TTL, key_func=_key("queries")))
+builder.add_node("complete_product_info", complete_product_info, cache_policy=CachePolicy(ttl=TTL, key_func=_key("selected_product_ids", "criteria")))
+builder.add_node("select_final_products", select_final_products, cache_policy=CachePolicy(ttl=TTL, key_func=_key("explored_products", "criteria")))
 builder.add_node("save_results_to_disk", save_results_to_disk)
-builder.add_node("generate_html_results", generate_html_results)
+builder.add_node("generate_html_results", generate_html_results, cache_policy=CachePolicy(ttl=TTL, key_func=_key("selected_products", "selected_criteria")))
 print("[GRAPH] All nodes wrapped with progress tracking")
 
 
@@ -66,7 +72,7 @@ builder.add_edge("generate_html_results", END)
 
 
 # For now, compile without checkpointer - we'll handle checkpointing in the execution layer
-graph = builder.compile(name="product-search-agent")
+graph = builder.compile(name="product-search-agent", cache=cache)
 
 
 
