@@ -38,7 +38,7 @@ FAST_MODEL = ChatVertexAI(
     model="gemini-2.0-flash-lite",
     temperature=0,
     max_tokens=None,
-    timeout=None,
+#    timeout=None,
     max_retries=10,
 #    rate_limiter=rate_limiter,
 )
@@ -47,7 +47,7 @@ BALANCED_MODEL = ChatVertexAI(
     model="gemini-2.0-flash-lite",
     temperature=0,
     max_tokens=None,
-    timeout=None,
+#    timeout=None,
     max_retries=10,
 #    rate_limiter=rate_limiter,
 )
@@ -65,7 +65,7 @@ CREATIVE_MODEL =  ChatVertexAI(
     model="gemini-2.0-flash-lite",
     temperature=0.3,
     max_tokens=None,
-    timeout=None,
+#    timeout=None,
     max_retries=10,
 )
 

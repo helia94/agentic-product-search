@@ -63,7 +63,6 @@ app.add_middleware(
 )
 
 
-# REST Endpoints - Thin Controllers Only
 @app.get("/api/health")
 async def health_check():
     """Health check endpoint"""
