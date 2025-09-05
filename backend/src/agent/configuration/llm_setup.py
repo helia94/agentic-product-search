@@ -3,8 +3,11 @@ from dotenv import load_dotenv
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_google_vertexai	import ChatVertexAI
 from langchain_groq import ChatGroq
+from pathlib import Path
+
 from langchain_core.rate_limiters import InMemoryRateLimiter
-from langchain.globals import set_debug
+from langchain.globals import set_debug, set_llm_cache
+from langchain_community.cache import SQLiteCache
 
 load_dotenv()
 
@@ -12,6 +15,10 @@ if os.getenv("GEMINI_API_KEY") is None:
     raise ValueError("GEMINI_API_KEY is not set")
 
 set_debug(True)
+
+# Enable persistent LLM result caching to speed up local development
+cache_path = Path(__file__).resolve().parent.parent / "llm_cache.sqlite"
+set_llm_cache(SQLiteCache(cache_path))
 
 rate_limiter = InMemoryRateLimiter(
     requests_per_second=0.2,  # 1 request every 5 seconds

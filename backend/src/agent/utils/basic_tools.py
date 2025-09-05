@@ -1,38 +1,37 @@
 
 from agent.configuration.llm_setup import get_llm
 from langchain_tavily import TavilySearch
-from langchain_core.rate_limiters import InMemoryRateLimiter
 from agent.utils.tool_orchestrator import create_tool_node, create_tool_router
-from langchain_google_vertexai import ChatVertexAI
-
-import os
-
-# Rate limiter for Gemini API to avoid rate limits
-rate_limiter = InMemoryRateLimiter(
-    requests_per_second=0.2,  # 1 request every 5 seconds
-    check_every_n_seconds=0.1,
-    max_bucket_size=1  # No burst requests
-)
+from langchain_core.tools import tool
+from langgraph.cache.memory import InMemoryCache
+from langgraph.types import default_cache_key
 
 # Use centralized LLM configuration
-llm_gemini = get_llm("search_query_generation")
-llm_llama3 = get_llm("use_case_selection")
+# Individual LLM instances can be fetched as needed
 
 tavily = TavilySearch(
-    max_results=2, #10
+    max_results=2,  # 10
     topic="general",
-    #include_answer="advanced",
-    #include_raw_content=True,
-    # include_images=False,
-    # include_image_descriptions=False,
-    # search_depth="basic",
-    # time_range="day",
-    #include_domains=["reddit.com/"],
-    #exclude_domains=["*/blog/*"],
-
 )
 
-tools = [tavily]
+# Simple in-memory cache for tool results
+_tool_cache = InMemoryCache()
+
+
+@tool
+def tavily_cached(query: str):
+    """Search Tavily with caching to avoid duplicate API calls."""
+    key = default_cache_key(query)
+    full_key = ("tavily_search", key)
+    cached = _tool_cache.get([full_key])
+    if full_key in cached:
+        return cached[full_key]
+    result = tavily.invoke(query)
+    _tool_cache.set({full_key: (result, None)})
+    return result
+
+
+tools = [tavily_cached]
 
 # Modification: tell the LLM which tools it can call  
 llm_with_tools = get_llm("pattern_tool_calls").bind_tools(tools, parallel_tool_calls=True)
