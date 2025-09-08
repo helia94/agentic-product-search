@@ -45,10 +45,7 @@ from agent.configuration.llm_setup import get_llm
 from agent.utils.tool_orchestrator import SimpleToolOrchestrator
 from agent.graph.search_pattern import BaseSearchState, execute_search_pattern_flexible, SearchConfig
 from agent.configuration.search_limits import (
-    get_search_limit, 
-    generate_search_prompt_text, 
-    is_search_limit_reached,
-    get_tavily_config,
+    SEARCH_LIMITS,
     ComponentNames
 )
 from langchain_tavily import TavilySearch
@@ -67,8 +64,7 @@ class State(BaseSearchState):
     messages_explore: Annotated[list, add_messages]
     products: List[ProductSimple]
     research_results: List[str]
-    max_explore_products: int
-    max_research_products: int
+    effort: str  # "low", "medium", "high" - controls search configuration via SearchLimitsConfig
     
     # BaseSearchState provides:
     # ai_queries: Annotated[List[AIMessage], add_messages]
@@ -79,7 +75,7 @@ class State(BaseSearchState):
 # Create Tavily instance with centralized configuration
 def create_exploration_tavily():
     """Create Tavily instance for product exploration with centralized config"""
-    tavily_config = get_tavily_config(ComponentNames.PRODUCT_EXPLORATION)
+    tavily_config = SEARCH_LIMITS.product_exploration_tavily
     return TavilySearch(
         max_results=tavily_config.max_results,
         include_answer=tavily_config.include_answer,

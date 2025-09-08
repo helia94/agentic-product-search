@@ -3,7 +3,7 @@ import json
 from agent.graph.state_V2 import OverallState
 from agent.graph.explore_agent_graph import graph_explore
 from agent.graph.final_info_graph import final_info_graph
-from agent.configuration.search_limits import get_max_explore_products, get_max_research_products
+from agent.configuration.search_limits import SEARCH_LIMITS
 from agent.tracing.node_progress import track_node_progress
 from langchain_core.runnables import RunnableConfig
 
@@ -24,8 +24,8 @@ def call_product_search_graph(state: OverallState, config: RunnableConfig = None
             "query": query_str,
             "queries": queries,
             "criteria": criteria,
-            "max_explore_products": get_max_explore_products(),
-            "max_research_products": get_max_research_products(),
+            "max_explore_products": SEARCH_LIMITS.max_explore_products,
+            "max_research_products": SEARCH_LIMITS.max_research_products,
         }
     )
 

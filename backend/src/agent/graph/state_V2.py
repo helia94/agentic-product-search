@@ -11,6 +11,8 @@ import operator
 from dataclasses import dataclass, field
 from pydantic import BaseModel, Field
 
+from backend.build.lib.agent.search_limits import SearchLimitsConfig
+
 
 
 class QueryBreakDown(BaseModel):
@@ -125,6 +127,7 @@ class ProductFull(TypedDict):
 class OverallState(TypedDict):
     user_query: str
     effort: str  # "low", "medium", "high" - controls search configuration
+    search_limits: SearchLimitsConfig
     country: str
     query_breakdown: QueryBreakDown
     query_tips: QueryTips
@@ -137,9 +140,6 @@ class OverallState(TypedDict):
     selected_products: List[ProductFull]
     selected_criteria: Criteria
     html_report: str
-    max_explore_products: int
-    max_research_products: int
-    max_explore_queries: int
     html_file_path: str
     
     # Human interaction fields

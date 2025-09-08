@@ -15,10 +15,10 @@ import time
 import logging
 from pydantic import BaseModel, Field
 from agent.configuration.search_limits import (
+    SEARCH_LIMITS,
     get_search_limit, 
     generate_search_prompt_text, 
     is_search_limit_reached,
-    get_concurrent_searches,
     ComponentNames
 )
 
@@ -248,7 +248,12 @@ def step2_generate_search_or_done(state: Dict[str, Any],
         return None, serializable_tool_info
     
     # Get concurrent search configuration
-    concurrent_count = get_concurrent_searches(config.component_name)
+    concurrent_configs = {
+        ComponentNames.PRODUCT_EXPLORATION: SEARCH_LIMITS.product_exploration_concurrent_searches,
+        ComponentNames.PRODUCT_RESEARCH: SEARCH_LIMITS.product_research_concurrent_searches,
+        ComponentNames.FINAL_PRODUCT_INFO: SEARCH_LIMITS.final_product_info_concurrent_searches,
+    }
+    concurrent_count = concurrent_configs.get(config.component_name, 3)  # Default fallback
     
     # Your exact search context with dynamic search limit text and concurrent search info
     search_context = {

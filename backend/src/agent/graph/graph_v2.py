@@ -16,7 +16,7 @@ from agent.graph.product_orchestration import call_product_search_graph, complet
 from agent.graph.result_processing import save_results_to_disk, select_final_products
 from agent.graph.html_generation import generate_html_results
 from agent.configuration import Configuration
-from agent.configuration.search_limits import initialize_graph_with_search_limits
+from agent.configuration.search_limits import set_search_effort_limits, SEARCH_LIMITS
 
 
 
@@ -29,6 +29,17 @@ builder = StateGraph(OverallState, config_schema=Configuration)
 
 
 
+def configure_search_effort(state: OverallState) -> OverallState:
+    """Configure search limits based on the effort level in the state"""
+    set_search_effort_limits(state)
+    return {
+        "search_limits": SEARCH_LIMITS
+    }
+
+
+    
+
+
 # Add tracked nodes to the graph
 # Helper to build cache keys from selected state fields
 def _key(*fields):
@@ -36,6 +47,7 @@ def _key(*fields):
 
 TTL = 60 * 60 * 24  # 24 hours
 
+builder.add_node("configure_search_effort", configure_search_effort)
 builder.add_node("pars_query", pars_query, cache_policy=CachePolicy(ttl=TTL, key_func=_key("user_query")))
 builder.add_node("enrich_query", enrich_query, cache_policy=CachePolicy(ttl=TTL, key_func=_key("user_query")))
 builder.add_node("human_ask_for_use_case", human_ask_for_use_case)
@@ -49,8 +61,9 @@ builder.add_node("generate_html_results", generate_html_results, cache_policy=Ca
 print("[GRAPH] All nodes wrapped with progress tracking")
 
 
-# Set the entrypoint 
-builder.add_edge(START, "pars_query")
+# Set the entrypoint - first configure search limits based on effort
+builder.add_edge(START, "configure_search_effort")
+builder.add_edge("configure_search_effort", "pars_query")
 builder.add_edge("pars_query", "enrich_query")
 
 builder.add_conditional_edges(
@@ -78,9 +91,8 @@ graph = builder.compile(name="product-search-agent", cache=cache)
 
 
 if __name__ == "__main__":
-    # Search limits are already configured when module is imported
-    print("[SEARCH] Search limits configured and ready...")
-    initialize_graph_with_search_limits(search_mode = "aggressive")
+    # Search limits will be configured dynamically based on state.effort
+    print("[SEARCH] Graph ready - search limits will be configured based on effort level")
     
     # Configuration options - change these to control execution
     RUN_FROM_BEGINNING = True  # Set to True to run from start, False to resume
@@ -90,7 +102,7 @@ if __name__ == "__main__":
     # Test the graph with a sample state - product limits now come from centralized config
     initial_state = OverallState(
         user_query="home physiotherapy device for Paraplegia patient",
-        effort="medium"  # Test with medium effort level
+        effort="low"
     )
 
     config = {"configurable": {"thread_id": THREAD_ID}}

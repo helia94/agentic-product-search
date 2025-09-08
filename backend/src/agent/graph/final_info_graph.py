@@ -23,10 +23,7 @@ from agent.configuration.llm_setup import get_llm
 from agent.utils.tool_orchestrator import SimpleToolOrchestrator
 from agent.graph.search_pattern import BaseSearchState, execute_search_pattern_flexible, SearchConfig
 from agent.configuration.search_limits import (
-    get_search_limit, 
-    generate_search_prompt_text, 
-    is_search_limit_reached,
-    get_tavily_config,
+    SEARCH_LIMITS,
     ComponentNames
 )
 from langchain_tavily import TavilySearch
@@ -52,7 +49,7 @@ class FinalInfoState(BaseSearchState):
 # Create Tavily instance with centralized configuration
 def create_final_info_tavily():
     """Create Tavily instance for final product info with centralized config"""
-    tavily_config = get_tavily_config(ComponentNames.FINAL_PRODUCT_INFO)
+    tavily_config = SEARCH_LIMITS.final_product_info_tavily
     return TavilySearch(
         max_results=tavily_config.max_results,
         include_answer=tavily_config.include_answer,

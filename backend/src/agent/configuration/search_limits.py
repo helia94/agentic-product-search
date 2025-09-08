@@ -7,380 +7,147 @@ across different graph components, ensuring consistency between prompts and hard
 
 from typing import Dict, Any, Optional
 from pydantic import BaseModel, Field
-
+global SEARCH_LIMITS
 
 class TavilyConfig(BaseModel):
     """Configuration for Tavily search parameters"""
-    max_results: int = Field(default=5, description="Maximum number of search results")
-    include_answer: bool = Field(default=False, description="Include direct answer in results") 
-    search_depth: str = Field(default="basic", description="Search depth: 'basic' or 'advanced'")
+    max_results: int = Field(description="Maximum number of search results")
+    include_answer: bool = Field(description="Include direct answer in results") 
+    search_depth: str = Field(description="Search depth: 'basic' or 'advanced'")
 
 
 class SearchLimitsConfig(BaseModel):
-    """Centralized configuration for search limits and Tavily settings across all graphs"""
+    """Base configuration for search limits and Tavily settings across all graphs"""
     
     # Simple search limits - one per pattern
-    product_exploration_max_searches: int = Field(default=2, description="Max searches for product exploration phase")
-    product_research_max_searches: int = Field(default=3, description="Max searches for detailed product research")
-    final_product_info_max_searches: int = Field(default=8, description="Max searches for final product information completion")
+    product_exploration_max_searches: int = Field(description="Max searches for product exploration phase")
+    product_research_max_searches: int = Field(description="Max searches for detailed product research")
+    final_product_info_max_searches: int = Field(description="Max searches for final product information completion")
     
     # Product processing limits
-    max_explore_products: int = Field(default=2, description="Maximum products to explore")
-    max_research_products: int = Field(default=2, description="Maximum products to research in detail")
-    max_explore_queries: int = Field(default=5, description="Maximum exploration queries to generate")
+    max_explore_products: int = Field(description="Maximum products to explore")
+    max_research_products: int = Field(description="Maximum products to research in detail")
+    max_explore_queries: int = Field(description="Maximum exploration queries to generate")
     
     # Concurrent tool calls configuration
-    product_exploration_concurrent_searches: int = Field(default=2, description="Number of parallel searches per step in exploration")
-    product_research_concurrent_searches: int = Field(default=3, description="Number of parallel searches per step in research")
-    final_product_info_concurrent_searches: int = Field(default=2, description="Number of parallel searches per step in final info")
+    product_exploration_concurrent_searches: int = Field(description="Number of parallel searches per step in exploration")
+    product_research_concurrent_searches: int = Field(description="Number of parallel searches per step in research")
+    final_product_info_concurrent_searches: int = Field(description="Number of parallel searches per step in final info")
     
     # Tavily configuration per component
-    product_exploration_tavily: TavilyConfig = Field(default_factory=lambda: TavilyConfig(max_results=3, include_answer=False, search_depth="basic"))
-    product_research_tavily: TavilyConfig = Field(default_factory=lambda: TavilyConfig(max_results=5, include_answer=True, search_depth="advanced")) 
-    final_product_info_tavily: TavilyConfig = Field(default_factory=lambda: TavilyConfig(max_results=4, include_answer=False, search_depth="basic"))
-    
-    def get_limits_for_component(self, component_name: str) -> int:
-        """Get the search limit for a specific component"""
-        component_limits = {
-            "product_exploration": self.product_exploration_max_searches,
-            "product_research": self.product_research_max_searches, 
-            "final_product_info": self.final_product_info_max_searches,
-        }
-        
-        return component_limits.get(component_name, 3)  # Default fallback
-    
-    def generate_prompt_text(self, component_name: str, current_searches: int = 0) -> str:
-        """Generate consistent prompt text about search limits"""
-        max_searches = self.get_limits_for_component(component_name)
-        
-        if current_searches > 0:
-            return f"- Max {max_searches} searches for this task. You already used {current_searches} searches."
-        else:
-            return f"- Use a MAX of {max_searches} searches for this task, ideally fewer."
-    
-    def check_search_limit(self, component_name: str, current_searches: int) -> bool:
-        """Check if we've reached the search limit for a component"""
-        max_searches = self.get_limits_for_component(component_name)
-        return current_searches >= max_searches
-    
-    def get_remaining_searches(self, component_name: str, current_searches: int) -> int:
-        """Get the number of remaining searches for a component"""
-        max_searches = self.get_limits_for_component(component_name)
-        return max(0, max_searches - current_searches)
-    
-    def get_tavily_config(self, component_name: str) -> TavilyConfig:
-        """Get Tavily configuration for a specific component"""
-        tavily_configs = {
-            "product_exploration": self.product_exploration_tavily,
-            "product_research": self.product_research_tavily,
-            "final_product_info": self.final_product_info_tavily,
-        }
-        
-        return tavily_configs.get(component_name, TavilyConfig())  # Default fallback
-    
-    def get_concurrent_searches(self, component_name: str) -> int:
-        """Get concurrent search count for a specific component"""
-        concurrent_configs = {
-            "product_exploration": self.product_exploration_concurrent_searches,
-            "product_research": self.product_research_concurrent_searches,
-            "final_product_info": self.final_product_info_concurrent_searches,
-        }
-        
-        return concurrent_configs.get(component_name, 3)  # Default fallback
+    product_exploration_tavily: TavilyConfig = Field(description="Tavily configuration for exploration")
+    product_research_tavily: TavilyConfig = Field(description="Tavily configuration for research")
+    final_product_info_tavily: TavilyConfig = Field(description="Tavily configuration for final info")
 
 
-# Global instance - single source of truth
-SEARCH_LIMITS = SearchLimitsConfig()
+
+class Low(SearchLimitsConfig):
+    """Low effort configuration - quick results with minimal searches"""
+    
+    product_exploration_max_searches: int = 2
+    product_research_max_searches: int = 2
+    final_product_info_max_searches: int = 3
+    
+    max_explore_products: int = 1
+    max_research_products: int = 1
+    max_explore_queries: int = 3
+    
+    product_exploration_concurrent_searches: int = 1
+    product_research_concurrent_searches: int = 2
+    final_product_info_concurrent_searches: int = 2
+    
+    product_exploration_tavily: TavilyConfig = Field(default_factory=lambda: TavilyConfig(max_results=2, include_answer=False, search_depth="basic"))
+    product_research_tavily: TavilyConfig = Field(default_factory=lambda: TavilyConfig(max_results=2, include_answer=True, search_depth="basic"))
+    final_product_info_tavily: TavilyConfig = Field(default_factory=lambda: TavilyConfig(max_results=2, include_answer=True, search_depth="basic"))
 
 
-# Convenience functions for easy access
-def get_search_limit(component_name: str) -> int:
-    """Get the search limit for a component"""
-    return SEARCH_LIMITS.get_limits_for_component(component_name)
+class Medium(SearchLimitsConfig):
+    """Medium effort configuration - balanced performance and thoroughness"""
+    
+    product_exploration_max_searches: int = 3
+    product_research_max_searches: int = 5
+    final_product_info_max_searches: int = 8
+    
+    max_explore_products: int = 4
+    max_research_products: int = 3
+    max_explore_queries: int = 5
+    
+    product_exploration_concurrent_searches: int = 5
+    product_research_concurrent_searches: int = 5
+    final_product_info_concurrent_searches: int = 5
+    
+    product_exploration_tavily: TavilyConfig = Field(default_factory=lambda: TavilyConfig(max_results=5, include_answer=False, search_depth="basic"))
+    product_research_tavily: TavilyConfig = Field(default_factory=lambda: TavilyConfig(max_results=5, include_answer=True, search_depth="advanced"))
+    final_product_info_tavily: TavilyConfig = Field(default_factory=lambda: TavilyConfig(max_results=5, include_answer=True, search_depth="basic"))
 
+
+class High(SearchLimitsConfig):
+    """High effort configuration - thorough research with comprehensive analysis"""
+    
+    product_exploration_max_searches: int = 5
+    product_research_max_searches: int = 12
+    final_product_info_max_searches: int = 10
+    
+    max_explore_products: int = 10
+    max_research_products: int = 5
+    max_explore_queries: int = 7
+    
+    product_exploration_concurrent_searches: int = 5
+    product_research_concurrent_searches: int = 5
+    final_product_info_concurrent_searches: int = 5
+    
+    product_exploration_tavily: TavilyConfig = Field(default_factory=lambda: TavilyConfig(max_results=5, include_answer=False, search_depth="basic"))
+    product_research_tavily: TavilyConfig = Field(default_factory=lambda: TavilyConfig(max_results=20, include_answer=True, search_depth="advanced"))
+    final_product_info_tavily: TavilyConfig = Field(default_factory=lambda: TavilyConfig(max_results=10, include_answer=True, search_depth="advanced"))
+
+
+
+# Convenience functions for backward compatibility
+def get_search_limit(component_name: str, search_limits) -> int:
+    """Get the search limit for a component - DEPRECATED: use SEARCH_LIMITS attributes directly"""
+    component_limits = {
+        "product_exploration": search_limits.product_exploration_max_searches,
+        "product_research": search_limits.product_research_max_searches, 
+        "final_product_info": search_limits.final_product_info_max_searches,
+    }
+    return component_limits.get(component_name, 3)
 
 def generate_search_prompt_text(component_name: str, current_searches: int = 0) -> str:
-    """Generate prompt text about search limits"""
-    return SEARCH_LIMITS.generate_prompt_text(component_name, current_searches)
-
+    """Generate prompt text about search limits - DEPRECATED: use SEARCH_LIMITS attributes directly"""
+    max_searches = get_search_limit(component_name)
+    
+    if current_searches > 0:
+        return f"- Max {max_searches} searches for this task. You already used {current_searches} searches."
+    else:
+        return f"- Use a MAX of {max_searches} searches for this task, ideally fewer."
 
 def is_search_limit_reached(component_name: str, current_searches: int) -> bool:
-    """Check if search limit is reached"""
-    return SEARCH_LIMITS.check_search_limit(component_name, current_searches)
-
+    """Check if search limit is reached - DEPRECATED: use SEARCH_LIMITS attributes directly"""
+    max_searches = get_search_limit(component_name)
+    return current_searches >= max_searches
 
 def get_remaining_searches(component_name: str, current_searches: int) -> int:
-    """Get remaining searches"""
-    return SEARCH_LIMITS.get_remaining_searches(component_name, current_searches)
+    """Get remaining searches - DEPRECATED: use SEARCH_LIMITS attributes directly"""
+    max_searches = get_search_limit(component_name)
+    return max(0, max_searches - current_searches)
 
 
-def get_tavily_config(component_name: str) -> TavilyConfig:
-    """Get Tavily configuration for a component"""
-    return SEARCH_LIMITS.get_tavily_config(component_name)
 
-
-def get_max_explore_products() -> int:
-    """Get maximum explore products limit"""
-    return SEARCH_LIMITS.max_explore_products
-
-
-def get_max_research_products() -> int:
-    """Get maximum research products limit"""
-    return SEARCH_LIMITS.max_research_products
-
-
-def get_max_explore_queries() -> int:
-    """Get maximum explore queries limit"""
-    return SEARCH_LIMITS.max_explore_queries
-
-
-def get_concurrent_searches(component_name: str) -> int:
-    """Get concurrent searches count for a component"""
-    return SEARCH_LIMITS.get_concurrent_searches(component_name)
-
-
-def configure_search_limits_from_main_graph(
-    product_exploration: int = None,
-    product_research: int = None, 
-    final_product_info: int = None,
-    # Product processing limits
-    max_explore_products: int = None,
-    max_research_products: int = None,
-    max_explore_queries: int = None,
-    # Concurrent search configuration
-    exploration_concurrent_searches: int = None,
-    research_concurrent_searches: int = None,
-    final_info_concurrent_searches: int = None,
-    # Tavily configuration
-    exploration_tavily_max_results: int = None,
-    exploration_tavily_include_answer: bool = None,
-    exploration_tavily_search_depth: str = None,
-    research_tavily_max_results: int = None,
-    research_tavily_include_answer: bool = None,
-    research_tavily_search_depth: str = None,
-    final_info_tavily_max_results: int = None,
-    final_info_tavily_include_answer: bool = None,
-    final_info_tavily_search_depth: str = None
-) -> None:
-    """
-    Configure search limits and Tavily settings from the main graph - allows override from graph_v2.py
-    
-    Usage from graph_v2.py:
-        configure_search_limits_from_main_graph(
-            product_exploration=2,    # explore-agent-graph uses this
-            product_research=3,       # research-with-pattern uses this  
-            final_product_info=8,     # final-info-graph uses this
-            
-            # Tavily settings
-            exploration_tavily_max_results=3,
-            exploration_tavily_include_answer=False,
-            exploration_tavily_search_depth="basic"
-        )
-    """
-    global SEARCH_LIMITS
-    
-    current_data = SEARCH_LIMITS.model_dump()
-    updates = {}
-    
-    # Update search limits
-    if product_exploration is not None:
-        updates['product_exploration_max_searches'] = product_exploration
-    if product_research is not None:
-        updates['product_research_max_searches'] = product_research
-    if final_product_info is not None:
-        updates['final_product_info_max_searches'] = final_product_info
-    
-    # Update product processing limits
-    if max_explore_products is not None:
-        updates['max_explore_products'] = max_explore_products
-    if max_research_products is not None:
-        updates['max_research_products'] = max_research_products
-    if max_explore_queries is not None:
-        updates['max_explore_queries'] = max_explore_queries
-    
-    # Update concurrent search configuration
-    if exploration_concurrent_searches is not None:
-        updates['product_exploration_concurrent_searches'] = exploration_concurrent_searches
-    if research_concurrent_searches is not None:
-        updates['product_research_concurrent_searches'] = research_concurrent_searches
-    if final_info_concurrent_searches is not None:
-        updates['final_product_info_concurrent_searches'] = final_info_concurrent_searches
-    
-    # Update Tavily configurations
-    if any([exploration_tavily_max_results is not None, exploration_tavily_include_answer is not None, exploration_tavily_search_depth is not None]):
-        tavily_config = current_data['product_exploration_tavily']
-        if exploration_tavily_max_results is not None:
-            tavily_config['max_results'] = exploration_tavily_max_results
-        if exploration_tavily_include_answer is not None:
-            tavily_config['include_answer'] = exploration_tavily_include_answer
-        if exploration_tavily_search_depth is not None:
-            tavily_config['search_depth'] = exploration_tavily_search_depth
-        updates['product_exploration_tavily'] = tavily_config
-    
-    if any([research_tavily_max_results is not None, research_tavily_include_answer is not None, research_tavily_search_depth is not None]):
-        tavily_config = current_data['product_research_tavily']
-        if research_tavily_max_results is not None:
-            tavily_config['max_results'] = research_tavily_max_results
-        if research_tavily_include_answer is not None:
-            tavily_config['include_answer'] = research_tavily_include_answer
-        if research_tavily_search_depth is not None:
-            tavily_config['search_depth'] = research_tavily_search_depth
-        updates['product_research_tavily'] = tavily_config
-    
-    if any([final_info_tavily_max_results is not None, final_info_tavily_include_answer is not None, final_info_tavily_search_depth is not None]):
-        tavily_config = current_data['final_product_info_tavily']
-        if final_info_tavily_max_results is not None:
-            tavily_config['max_results'] = final_info_tavily_max_results
-        if final_info_tavily_include_answer is not None:
-            tavily_config['include_answer'] = final_info_tavily_include_answer
-        if final_info_tavily_search_depth is not None:
-            tavily_config['search_depth'] = final_info_tavily_search_depth
-        updates['final_product_info_tavily'] = tavily_config
-    
-    if updates:
-        # Create new instance with updated values
-        current_data.update(updates)
-        SEARCH_LIMITS = SearchLimitsConfig(**current_data)
-        
-        print(f"Updated search limits and Tavily config: {list(updates.keys())}")
-
-
-# Component name constants for consistency
 class ComponentNames:
     PRODUCT_EXPLORATION = "product_exploration"  # explore_agent_graph.py
     PRODUCT_RESEARCH = "product_research"        # research_with_pattern.py
     FINAL_PRODUCT_INFO = "final_product_info"    # final_info_graph.py
 
 
-def configure_search_limits_for_product_search():
-    """
-    Configure search limits for the product search workflow.
-    Simple configuration with just three values - one per search pattern.
-    Also configures Tavily settings and product processing limits for each component.
-    """
-    configure_search_limits_from_main_graph(
-        product_exploration=2,      # explore-agent-graph 
-        product_research=3,         # research-with-pattern
-        final_product_info=8,       # final-info-graph
-        
-        # Product processing limits
-        max_explore_products=2,
-        max_research_products=2,
-        max_explore_queries=5,
-        
-        # Concurrent search configuration - parallel tool calls per step
-        exploration_concurrent_searches=3,
-        research_concurrent_searches=3,
-        final_info_concurrent_searches=3,
-        
-        # Tavily configuration - customize these settings
-        exploration_tavily_max_results=3,
-        exploration_tavily_include_answer=False,
-        exploration_tavily_search_depth="basic",
-        
-        research_tavily_max_results=5,
-        research_tavily_include_answer=True,
-        research_tavily_search_depth="advanced",
-        
-        final_info_tavily_max_results=4,
-        final_info_tavily_include_answer=False,
-        final_info_tavily_search_depth="basic"
-    )
-    print("Search limits configured: explore=2, research=3, final=8")
-    print("Product limits: explore=2 products, research=2 products, queries=5")
-    print("Concurrent searches: exploration=2, research=3, final=2 parallel calls per step")
-    print("Tavily configured: exploration=3/basic, research=5/advanced, final=4/basic")
+def map_to_search_limits(effort: str) -> SearchLimitsConfig:
+    """Map effort level to corresponding SearchLimitsConfig"""
+    effort_map = {
+        "low": Low(),
+        "medium": Medium(),
+        "high": High()
+    }
+    return effort_map.get(effort.lower()) 
 
-
-def configure_aggressive_search_limits():
-    """
-    Configure more aggressive (faster) search limits for quick results.
-    """
-    configure_search_limits_from_main_graph(
-        product_exploration=3,
-        product_research=3, 
-        final_product_info=3,
-        
-        # Aggressive product limits - fewer products for speed
-        max_explore_products=2,
-        max_research_products=1,
-        max_explore_queries=3,
-        
-        # Aggressive concurrent searches - more parallel calls for speed
-        exploration_concurrent_searches=2,
-        research_concurrent_searches=2,
-        final_info_concurrent_searches=2,
-        
-        # Aggressive Tavily settings - fewer results, basic search
-        exploration_tavily_max_results=5,
-        exploration_tavily_include_answer=False,
-        exploration_tavily_search_depth="basic", 
-        
-        research_tavily_max_results=5,
-        research_tavily_include_answer=True,
-        research_tavily_search_depth="basic",
-        
-        final_info_tavily_max_results=5,
-        final_info_tavily_include_answer=True,
-        final_info_tavily_search_depth="basic"
-    )
-    print("⚡ Aggressive search limits: explore=3, research=3, final=3")
-    print("📦 Aggressive product limits: explore=2 products, research=1 product, queries=3")
-    print("🚀 Aggressive concurrent: exploration=3, research=4, final=3 parallel calls per step")
-    print("🔍 Aggressive Tavily: exploration=5/basic, research=5/basic, final=5/basic")
-
-
-def configure_thorough_search_limits():
-    """
-    Configure more thorough search limits for comprehensive research.
-    """
-    configure_search_limits_from_main_graph(
-        product_exploration=5,
-        product_research=10,
-        final_product_info=10,
-        
-        # Thorough product limits - more products for comprehensive analysis
-        max_explore_queries=7,
-        max_explore_products=10,
-        max_research_products=5,
-        
-        # Thorough concurrent searches - moderate parallel calls for accuracy
-        exploration_concurrent_searches=3,
-        research_concurrent_searches=3,
-        final_info_concurrent_searches=3,
-        
-        # Thorough Tavily settings - more results, advanced search
-        exploration_tavily_max_results=5,
-        exploration_tavily_include_answer=False,
-        exploration_tavily_search_depth="basic",
-        
-        research_tavily_max_results=20,
-        research_tavily_include_answer=True,
-        research_tavily_search_depth="advanced",
-        
-        final_info_tavily_max_results=10,
-        final_info_tavily_include_answer=True,
-        final_info_tavily_search_depth="advanced"
-    )
-    print("🔍 Thorough search limits: explore=5, research=10, final=10")
-    print("📦 Thorough product limits: explore=7 products, research=2 products, queries=5")
-    print("🚀 Thorough concurrent: exploration=2, research=3, final=3 parallel calls per step")
-    print("🔍 Thorough Tavily: exploration=5/basic, research=20/advanced, final=10/advanced")
-
-
-def initialize_graph_with_search_limits(search_mode: str = "default"):
-    """
-    Initialize the graph with specified search limit configuration.
-    
-    Args:
-        search_mode: "default", "aggressive", or "thorough"
-    
-    Returns:
-        None (configuration is applied globally)
-    """
-    if search_mode == "aggressive":
-        configure_aggressive_search_limits()
-    elif search_mode == "thorough":
-        configure_thorough_search_limits() 
-    else:
-        configure_search_limits_for_product_search()
+def set_search_effort_limits(state):
+    global SEARCH_LIMITS
+    SEARCH_LIMITS = map_to_search_limits(state.get("effort", "low"))
