@@ -113,8 +113,8 @@ export const ResearchThinkPanel: React.FC<ResearchThinkPanelProps> = ({
 
   if (!researchData) {
     return (
-      <div className="bg-neutral-900 rounded-lg p-6 h-full">
-        <div className="flex items-center justify-center h-full text-neutral-400">
+      <div className="bg-gray-50 rounded-lg p-6 h-full">
+        <div className="flex items-center justify-center h-full text-gray-600">
           <div className="text-center">
             <AlertCircle className="h-12 w-12 mx-auto mb-4 opacity-50" />
             <p>Waiting for research to start...</p>
@@ -125,11 +125,11 @@ export const ResearchThinkPanel: React.FC<ResearchThinkPanelProps> = ({
   }
 
   return (
-    <div className="bg-neutral-900 rounded-lg h-full flex flex-col">
+    <div className="bg-gray-50 rounded-lg h-full flex flex-col">
       {/* Header */}
-      <div className="border-b border-neutral-800 p-6">
+      <div className="border-b border-gray-300 p-6">
         <h2 className="text-xl font-semibold text-white mb-2">Research Think Panel</h2>
-        <div className="flex items-center gap-4 text-sm text-neutral-400">
+        <div className="flex items-center gap-4 text-sm text-gray-600">
           <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(researchData.overallStatus)}`}>
             {researchData.overallStatus === 'planning' && 'Planning'}
             {researchData.overallStatus === 'researching' && 'Researching'}
@@ -148,26 +148,26 @@ export const ResearchThinkPanel: React.FC<ResearchThinkPanelProps> = ({
       <div className="flex-1 overflow-y-auto">
         {/* Planning Section */}
         {researchData.planning && (
-          <div className="border-b border-neutral-800 p-6">
+          <div className="border-b border-gray-300 p-6">
             <h3 className="text-lg font-medium text-white mb-4 flex items-center gap-2">
               <div className="h-2 w-2 bg-purple-400 rounded-full"></div>
               Research Planning Strategy
             </h3>
-            <div className="bg-neutral-800 rounded-lg p-4">
+            <div className="bg-gray-100 rounded-lg p-4">
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
                 <div className="text-center">
                   <div className="text-2xl font-bold text-purple-400">{researchData.planning.totalTasks}</div>
-                  <div className="text-sm text-neutral-400">Total Tasks</div>
+                  <div className="text-sm text-gray-600">Total Tasks</div>
                 </div>
                 <div className="text-center">
                   <div className="text-2xl font-bold text-blue-400">{researchData.planning.currentTaskIndex + 1}</div>
-                  <div className="text-sm text-neutral-400">Current Task</div>
+                  <div className="text-sm text-gray-600">Current Task</div>
                 </div>
                 <div className="text-center">
                   <div className="text-2xl font-bold text-green-400">
                     {researchData.planning.tasks.filter(t => t.status === 'completed').length}
                   </div>
-                  <div className="text-sm text-neutral-400">Completed</div>
+                  <div className="text-sm text-gray-600">Completed</div>
                 </div>
               </div>
               
@@ -178,10 +178,10 @@ export const ResearchThinkPanel: React.FC<ResearchThinkPanelProps> = ({
                     className={`flex items-center gap-3 p-3 rounded-lg ${
                       index === researchData.planning!.currentTaskIndex
                         ? 'bg-blue-900/30 border border-blue-800'
-                        : 'bg-neutral-700/50'
+                        : 'bg-gray-200/50'
                     }`}
                   >
-                    <div className="text-sm font-mono text-neutral-400 w-8">
+                    <div className="text-sm font-mono text-gray-600 w-8">
                       #{index + 1}
                     </div>
                     {getStatusIcon(task.status)}
@@ -201,7 +201,7 @@ export const ResearchThinkPanel: React.FC<ResearchThinkPanelProps> = ({
           </h3>
           
           {researchData.tasks.length === 0 ? (
-            <div className="text-center py-8 text-neutral-400">
+            <div className="text-center py-8 text-gray-600">
               <Clock className="h-8 w-8 mx-auto mb-2 opacity-50" />
               <p>No task details available</p>
             </div>
@@ -253,22 +253,22 @@ const TaskCard: React.FC<TaskCardProps> = ({
   });
 
   return (
-    <div className="bg-neutral-800 rounded-lg border border-neutral-700">
+    <div className="bg-gray-100 rounded-lg border border-gray-300">
       {/* Task Header */}
       <div
-        className="p-4 cursor-pointer hover:bg-neutral-750 transition-colors"
+        className="p-4 cursor-pointer hover:bg-gray-100 transition-colors"
         onClick={onToggleExpansion}
       >
         <div className="flex items-center gap-3">
           {isExpanded ? (
-            <ChevronDown className="h-4 w-4 text-neutral-400" />
+            <ChevronDown className="h-4 w-4 text-gray-600" />
           ) : (
-            <ChevronRight className="h-4 w-4 text-neutral-400" />
+            <ChevronRight className="h-4 w-4 text-gray-600" />
           )}
           {getStatusIcon(task.status)}
           <div className="flex-1">
             <div className="font-medium text-white">{task.description}</div>
-            <div className="text-sm text-neutral-400 mt-1">
+            <div className="text-sm text-gray-600 mt-1">
               {task.steps.length} execution steps
             </div>
           </div>
@@ -282,9 +282,9 @@ const TaskCard: React.FC<TaskCardProps> = ({
 
       {/* Task Steps */}
       {isExpanded && (
-        <div className="border-t border-neutral-700 p-4 space-y-3">
+        <div className="border-t border-gray-300 p-4 space-y-3">
           {task.steps.length === 0 ? (
-            <div className="text-center py-4 text-neutral-500 text-sm">
+            <div className="text-center py-4 text-gray-600 text-sm">
               No execution steps available
             </div>
           ) : (
@@ -326,7 +326,7 @@ const StepCard: React.FC<StepCardProps> = ({
   const [showAllSources, setShowAllSources] = React.useState(false);
 
   return (
-    <div className="bg-neutral-700/50 rounded-lg border border-neutral-600">
+    <div className="bg-gray-200/50 rounded-lg border border-neutral-600">
       {/* Step Header */}
       <div
         className={`p-3 ${hasDetails ? 'cursor-pointer hover:bg-neutral-600/50' : ''} transition-colors`}
@@ -335,15 +335,15 @@ const StepCard: React.FC<StepCardProps> = ({
         <div className="flex items-center gap-3">
           {hasDetails && (
             isExpanded ? (
-              <ChevronDown className="h-3 w-3 text-neutral-400" />
+              <ChevronDown className="h-3 w-3 text-gray-600" />
             ) : (
-              <ChevronRight className="h-3 w-3 text-neutral-400" />
+              <ChevronRight className="h-3 w-3 text-gray-600" />
             )
           )}
           {getStatusIcon(step.status)}
           <div className="flex-1">
             <div className="font-medium text-white text-sm">{step.title}</div>
-            <div className="text-xs text-neutral-400 mt-1">
+            <div className="text-xs text-gray-600 mt-1">
               {step.type === 'query_generation' && 'Query Generation'}
               {step.type === 'web_research' && 'Web Research'}
               {step.type === 'reflection' && 'Reflection Analysis'}
@@ -365,7 +365,7 @@ const StepCard: React.FC<StepCardProps> = ({
       {isExpanded && step.details && (
         <div className="border-t border-neutral-600 p-3 space-y-2">
           {step.details.map((detail, detailIndex) => (
-            <div key={detailIndex} className="bg-neutral-800/50 rounded p-3">
+            <div key={detailIndex} className="bg-gray-100/50 rounded p-3">
               <div className="text-xs font-medium text-neutral-300 mb-2 uppercase tracking-wide">
                 {detail.type === 'search_queries' && 'Search Queries'}
                 {detail.type === 'sources' && 'Data Sources'}
@@ -377,7 +377,7 @@ const StepCard: React.FC<StepCardProps> = ({
               {detail.metadata && (
                 <div className="space-y-2">
                   {detail.metadata.count !== undefined && (
-                    <div className="text-xs text-neutral-400">
+                    <div className="text-xs text-gray-600">
                       Count: {detail.metadata.count}
                     </div>
                   )}
@@ -386,7 +386,7 @@ const StepCard: React.FC<StepCardProps> = ({
                     <div className="space-y-1">
                       <div className="text-xs font-medium text-neutral-300">Source Details:</div>
                       {(showAllSources ? detail.metadata.sources : detail.metadata.sources.slice(0, 3)).map((source, sourceIndex) => (
-                        <div key={sourceIndex} className="text-xs text-neutral-400 bg-neutral-800 rounded p-2">
+                        <div key={sourceIndex} className="text-xs text-gray-600 bg-gray-100 rounded p-2">
                           <div className="font-medium text-neutral-300">{source.title}</div>
                           <div className="text-xs text-blue-400 mt-1">
                             <span className="bg-blue-900/30 px-1 py-0.5 rounded text-xs mr-2">{source.label}</span>
@@ -395,7 +395,7 @@ const StepCard: React.FC<StepCardProps> = ({
                             <div className="text-blue-400 break-all mt-1 text-xs">{source.url}</div>
                           )}
                           {source.snippet && (
-                            <div className="mt-1 text-neutral-400 text-xs">{source.snippet}</div>
+                            <div className="mt-1 text-gray-600 text-xs">{source.snippet}</div>
                           )}
                         </div>
                       ))}
@@ -420,7 +420,7 @@ const StepCard: React.FC<StepCardProps> = ({
                   {detail.metadata.follow_up_queries && (
                     <div className="space-y-1">
                       <div className="text-xs font-medium text-neutral-300">Follow-up Queries:</div>
-                      <div className="text-xs text-neutral-400">
+                      <div className="text-xs text-gray-600">
                         {detail.metadata.follow_up_queries.join(', ')}
                       </div>
                     </div>

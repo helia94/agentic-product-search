@@ -250,7 +250,7 @@ export default function App() {
 
 
   return (
-    <div className="flex h-screen bg-neutral-800 text-neutral-100 font-sans antialiased">
+    <div className="flex h-screen bg-background text-foreground font-sans antialiased">
       <main className="flex-1 flex flex-col overflow-hidden w-full h-full">
         <div className="flex-1 flex flex-col h-full overflow-hidden">
           {thread.messages.length === 0 ? (

@@ -54,18 +54,18 @@ const getNodeIcon = (event: NodeProgressEvent, isActive: boolean) => {
   const iconClass = "w-4 h-4";
   
   if (event.event_type === "node_error") {
-    return <AlertCircle className={`${iconClass} text-red-400`} />;
+    return <AlertCircle className={`${iconClass} text-red-600`} />;
   }
   
   if (event.event_type === "node_end") {
-    return <CheckCircle2 className={`${iconClass} text-green-400`} />;
+    return <CheckCircle2 className={`${iconClass} text-green-600`} />;
   }
   
   if (event.event_type === "node_start" && isActive) {
-    return <Play className={`${iconClass} text-blue-400 animate-pulse`} />;
+    return <Play className={`${iconClass} text-blue-600 animate-pulse`} />;
   }
   
-  return <Circle className={`${iconClass} text-gray-400`} />;
+  return <Circle className={`${iconClass} text-gray-500`} />;
 };
 
 const formatDuration = (ms?: number): string => {
@@ -164,10 +164,10 @@ export const ProgressTracker: React.FC<ProgressTrackerProps> = ({
     });
 
   return (
-    <Card className="w-full bg-gray-900 border-gray-700">
+    <Card className="w-full bg-gray-50 border-gray-300">
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between">
-          <CardTitle className="text-lg font-semibold text-white">
+          <CardTitle className="text-lg font-semibold text-gray-800">
             Analysis Progress
           </CardTitle>
           <div className="flex items-center gap-2">
@@ -184,7 +184,7 @@ export const ProgressTracker: React.FC<ProgressTrackerProps> = ({
                 onClick={onStop}
                 size="sm"
                 variant="destructive"
-                className="bg-red-600 hover:bg-red-700 text-white"
+                className="bg-red-500 hover:bg-red-600 text-white"
               >
                 <StopCircle className="w-4 h-4 mr-1" />
                 Stop
@@ -197,7 +197,7 @@ export const ProgressTracker: React.FC<ProgressTrackerProps> = ({
         <ScrollArea className="h-64 w-full" ref={scrollAreaRef}>
           <div className="space-y-2">
             {nodeList.length === 0 ? (
-              <div className="text-gray-400 text-center py-4">
+              <div className="text-gray-600 text-center py-4">
                 <Square className="w-8 h-8 mx-auto mb-2" />
                 Waiting to start...
               </div>
@@ -206,8 +206,8 @@ export const ProgressTracker: React.FC<ProgressTrackerProps> = ({
                 <div 
                   key={key}
                   className={`flex items-center gap-3 p-2 rounded-md transition-colors ${
-                    isActive ? 'bg-blue-500/10 border border-blue-500/20' : 
-                    isCompleted ? 'bg-gray-800/50' : 'bg-gray-800/30'
+                    isActive ? 'bg-blue-100 border border-blue-300' : 
+                    isCompleted ? 'bg-gray-100' : 'bg-gray-50'
                   }`}
                 >
                   <div className="flex-shrink-0">
@@ -217,15 +217,15 @@ export const ProgressTracker: React.FC<ProgressTrackerProps> = ({
                   <div className="flex-grow min-w-0">
                     <div className="flex items-center justify-between">
                       <span className={`text-sm font-medium truncate ${
-                        isActive ? 'text-blue-300' : 
-                        error ? 'text-red-300' : 
-                        isCompleted ? 'text-green-300' : 'text-gray-300'
+                        isActive ? 'text-blue-700' : 
+                        error ? 'text-red-700' : 
+                        isCompleted ? 'text-green-700' : 'text-gray-700'
                       }`}>
                         {NODE_DISPLAY_NAMES[event.node_name] || event.node_name}
                       </span>
                       
                       {duration && (
-                        <div className="flex items-center gap-1 text-xs text-gray-400">
+                        <div className="flex items-center gap-1 text-xs text-gray-600">
                           <Clock className="w-3 h-3" />
                           {formatDuration(duration)}
                         </div>
@@ -233,13 +233,13 @@ export const ProgressTracker: React.FC<ProgressTrackerProps> = ({
                     </div>
                     
                     {event.graph_name && event.graph_name !== 'main' && (
-                      <div className="text-xs text-gray-500 truncate">
+                      <div className="text-xs text-gray-600 truncate">
                         {event.graph_name}
                       </div>
                     )}
                     
                     {error && (
-                      <div className="text-xs text-red-400 truncate mt-1">
+                      <div className="text-xs text-red-600 truncate mt-1">
                         Error: {error}
                       </div>
                     )}
@@ -251,8 +251,8 @@ export const ProgressTracker: React.FC<ProgressTrackerProps> = ({
         </ScrollArea>
         
         {currentStatus?.error && (
-          <div className="mt-3 p-3 bg-red-900/20 border border-red-500/30 rounded-md">
-            <div className="flex items-center gap-2 text-red-400 text-sm">
+          <div className="mt-3 p-3 bg-red-50 border border-red-300 rounded-md">
+            <div className="flex items-center gap-2 text-red-700 text-sm">
               <AlertCircle className="w-4 h-4 flex-shrink-0" />
               <span className="font-medium">Error:</span>
               <span className="truncate">{currentStatus.error}</span>

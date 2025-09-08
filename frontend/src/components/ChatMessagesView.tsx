@@ -26,11 +26,25 @@ const isHtmlContent = (content: string): boolean => {
 
 // Component for rendering HTML content safely
 const HtmlRenderer: React.FC<{ content: string }> = ({ content }) => {
-  const sanitizedHtml = DOMPurify.sanitize(content);
+  const sanitizedHtml = DOMPurify.sanitize(content, {
+    WHOLE_DOCUMENT: true,
+    RETURN_DOM: false,
+    RETURN_DOM_FRAGMENT: false,
+    RETURN_DOM_IMPORT: false,
+    SANITIZE_DOM: true,
+    KEEP_CONTENT: true,
+    ADD_TAGS: ['html', 'head', 'body', 'meta', 'link', 'style', 'title'],
+    ADD_ATTR: ['charset', 'name', 'content', 'rel', 'href', 'type', 'media']
+  });
+  
   return (
     <div 
       dangerouslySetInnerHTML={{ __html: sanitizedHtml }}
-      className="w-full"
+      className="w-full h-full html-content-reset"
+      style={{ 
+        minHeight: '100%',
+        overflow: 'auto'
+      }}
     />
   );
 };
@@ -173,7 +187,7 @@ const HumanMessageBubble: React.FC<HumanMessageBubbleProps> = ({
 
   return (
     <div
-      className={`text-white rounded-3xl break-words min-h-7 bg-neutral-700 max-w-[100%] sm:max-w-[90%] px-4 pt-3 rounded-br-lg`}
+      className={`text-card-foreground rounded-3xl break-words min-h-7 bg-card border border-border max-w-[100%] sm:max-w-[90%] px-4 pt-3 rounded-br-lg`}
     >
       {isHtmlContent(content) ? (
         <HtmlRenderer content={content} />
@@ -267,7 +281,7 @@ const AiMessageBubble: React.FC<AiMessageBubbleProps> = ({
       })()}
       <Button
         variant="default"
-        className="cursor-pointer bg-neutral-700 border-neutral-600 text-neutral-300 self-end"
+        className="cursor-pointer bg-card border border-border text-card-foreground self-end"
         onClick={() =>
           handleCopy(
             typeof message.content === "string"
@@ -380,6 +394,45 @@ export function ChatMessagesView({
     }
   }, [messages, liveActivityEvents, isLoading]); // Add isLoading dependency to ensure real-time updates
 
+  // Check if the last AI message contains HTML content
+  const lastAiMessage = messages.filter(msg => msg.type === "ai").pop();
+  const lastAiContent = lastAiMessage ? (typeof lastAiMessage.content === "string" ? lastAiMessage.content : JSON.stringify(lastAiMessage.content)) : "";
+  const hasHtmlResult = lastAiMessage && isHtmlContent(lastAiContent);
+
+  // If we have HTML result, show it full-screen with input below
+  if (hasHtmlResult) {
+    return (
+      <>
+        {/* Human Interaction Modal */}
+        {humanRequest && onSubmitHumanResponse && (
+          <HumanInteractionModal
+            question={humanRequest.question}
+            query={humanRequest.query}
+            onSubmit={onSubmitHumanResponse}
+            isVisible={true}
+          />
+        )}
+
+        <div className="flex flex-col h-full">
+          {/* Full-screen HTML content */}
+          <div className="flex-1 w-full h-full overflow-hidden">
+            <HtmlRenderer content={lastAiContent} />
+          </div>
+          
+          {/* Input form at the bottom */}
+          <div className="flex-shrink-0">
+            <InputForm
+              onSubmit={onSubmit}
+              isLoading={isLoading}
+              onCancel={onCancel}
+              hasHistory={messages.length > 0}
+            />
+          </div>
+        </div>
+      </>
+    );
+  }
+
   return (
     <>
       {/* Human Interaction Modal */}
@@ -396,13 +449,13 @@ export function ChatMessagesView({
         {/* Left message area */}
         <div className={`flex flex-col transition-all duration-300 ${showThinkPanel ? 'w-1/2' : 'w-full'}`}>
         {/* Toggle button */}
-        <div className="flex justify-between items-center p-4 border-b border-neutral-800 flex-shrink-0">
-          <h3 className="text-lg font-medium text-white">Conversation</h3>
+        <div className="flex justify-between items-center p-4 border-b border-border flex-shrink-0">
+          <h3 className="text-lg font-medium text-foreground">Conversation</h3>
           <Button
             variant="outline"
             size="sm"
             onClick={() => setShowThinkPanel(!showThinkPanel)}
-            className="text-neutral-400 border-neutral-600 hover:bg-neutral-700"
+            className="text-muted-foreground border-border hover:bg-accent"
           >
             {showThinkPanel ? <EyeOff className="h-4 w-4 mr-2" /> : <Eye className="h-4 w-4 mr-2" />}
             {showThinkPanel ? 'Hide Think Panel' : 'Show Think Panel'}
@@ -445,9 +498,9 @@ export function ChatMessagesView({
             {/* 🔧 FIXED: Improved loading state display - only show when truly needed */}
             {isLoading && messages.length === 0 && (
               <div className="flex items-start gap-3 mt-3">
-                <div className="relative group max-w-[85%] md:max-w-[80%] rounded-xl p-3 shadow-sm break-words bg-neutral-800 text-neutral-100 rounded-bl-none w-full min-h-[56px]">
+                <div className="relative group max-w-[85%] md:max-w-[80%] rounded-xl p-3 shadow-sm break-words bg-card text-card-foreground border border-border rounded-bl-none w-full min-h-[56px]">
                   <div className="flex items-center justify-start h-full">
-                    <Loader2 className="h-5 w-5 animate-spin text-neutral-400 mr-2" />
+                    <Loader2 className="h-5 w-5 animate-spin text-muted-foreground mr-2" />
                     <span>Initializing research...</span>
                   </div>
                 </div>
@@ -456,10 +509,10 @@ export function ChatMessagesView({
             {/* 🔧 NEW: When last message is human and loading, show processing state */}
             {isLoading && messages.length > 0 && messages[messages.length - 1].type === "human" && (
               <div className="flex items-start gap-3 mt-3">
-                <div className="relative group max-w-[85%] md:max-w-[80%] rounded-xl p-3 shadow-sm break-words bg-neutral-800 text-neutral-100 rounded-bl-none w-full min-h-[56px]">
+                <div className="relative group max-w-[85%] md:max-w-[80%] rounded-xl p-3 shadow-sm break-words bg-card text-card-foreground border border-border rounded-bl-none w-full min-h-[56px]">
                   {showThinkPanel ? (
                     <div className="flex items-center justify-start h-full">
-                      <Loader2 className="h-5 w-5 animate-spin text-neutral-400 mr-2" />
+                      <Loader2 className="h-5 w-5 animate-spin text-muted-foreground mr-2" />
                       <span>Processing... (Detailed information can be found in the right think panel)</span>
                     </div>
                   ) : (
@@ -472,7 +525,7 @@ export function ChatMessagesView({
                       </div>
                     ) : (
                       <div className="flex items-center justify-start h-full">
-                        <Loader2 className="h-5 w-5 animate-spin text-neutral-400 mr-2" />
+                        <Loader2 className="h-5 w-5 animate-spin text-muted-foreground mr-2" />
                         <span>Processing...</span>
                       </div>
                     )
@@ -495,7 +548,7 @@ export function ChatMessagesView({
 
       {/* Right panel - progress tracker or think panel */}
       {showThinkPanel && (
-        <div className="w-1/2 border-l border-neutral-800 flex flex-col h-full">
+        <div className="w-1/2 border-l border-border flex flex-col h-full">
           {/* Show progress tracker if there are progress events, otherwise show think panel */}
           {progressEvents.length > 0 || isLoading ? (
             <div className="p-4 h-full overflow-auto">
