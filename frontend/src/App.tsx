@@ -54,6 +54,15 @@ function useSearchApi(): SearchState {
     if (!currentJobId.current) return;
     
     try {
+      // Add user message to chat immediately
+      const userMessage: Message = {
+        type: "human",
+        content: response,
+        id: Date.now().toString(),
+      };
+      setMessages(prev => [...prev, userMessage]);
+      
+      // Submit to backend
       const apiUrl = import.meta.env.DEV ? "http://localhost:8000" : "http://localhost:8000";
       await fetch(`${apiUrl}/api/human-response`, {
         method: 'POST',
@@ -226,6 +235,12 @@ export default function App() {
   const handleSubmit = useCallback(
     (submittedInputValue: string, effort: string) => {
       if (!submittedInputValue.trim()) return;
+      
+      // If there's a pending human request, submit the response instead of starting a new search
+      if (thread.humanRequest) {
+        thread.submitHumanResponse(submittedInputValue.trim());
+        return;
+      }
       
       const newMessages: Message[] = [
         ...(thread.messages || []),

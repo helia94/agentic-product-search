@@ -11,11 +11,17 @@ import {
 } from "@/components/ui/select";
 
 // Updated InputFormProps
+interface HumanInteractionRequest {
+  question: string;
+  query: string;
+}
+
 interface InputFormProps {
   onSubmit: (inputValue: string, effort: string) => void;
   onCancel: () => void;
   isLoading: boolean;
   hasHistory: boolean;
+  humanRequest?: HumanInteractionRequest | null;
 }
 
 export const InputForm: React.FC<InputFormProps> = ({
@@ -23,6 +29,7 @@ export const InputForm: React.FC<InputFormProps> = ({
   onCancel,
   isLoading,
   hasHistory,
+  humanRequest,
 }) => {
   const [internalInputValue, setInternalInputValue] = useState("");
   const [effort, setEffort] = useState("medium");
@@ -59,7 +66,11 @@ export const InputForm: React.FC<InputFormProps> = ({
           value={internalInputValue}
           onChange={(e) => setInternalInputValue(e.target.value)}
           onKeyDown={handleInternalKeyDown}
-          placeholder="Accurate sleep tracking device for sleep improvement"
+          placeholder={
+            humanRequest 
+              ? "Type your response to the question above, or click one of the options..."
+              : "Accurate sleep tracking device for sleep improvement"
+          }
           className={`w-full text-foreground placeholder-muted-foreground resize-none border-0 focus:outline-none focus:ring-0 outline-none focus-visible:ring-0 shadow-none bg-transparent
                         md:text-base  min-h-[56px] max-h-[200px]`}
           rows={1}

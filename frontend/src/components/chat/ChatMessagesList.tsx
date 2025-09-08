@@ -5,6 +5,11 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { ActivityTimeline, ProcessedEvent } from "@/components/ActivityTimeline";
 import { HumanMessageBubble, AiMessageBubble } from "./message-bubbles";
 
+interface HumanInteractionRequest {
+  question: string;
+  query: string;
+}
+
 interface ChatMessagesListProps {
   messages: Message[];
   isLoading: boolean;
@@ -14,6 +19,8 @@ interface ChatMessagesListProps {
   handleCopy: (text: string, messageId: string) => void;
   copiedMessageId: string | null;
   showCompactTimeline: boolean;
+  humanRequest?: HumanInteractionRequest | null;
+  onSubmitHumanResponse?: (response: string) => void;
 }
 
 export const ChatMessagesList: React.FC<ChatMessagesListProps> = ({
@@ -25,6 +32,8 @@ export const ChatMessagesList: React.FC<ChatMessagesListProps> = ({
   handleCopy,
   copiedMessageId,
   showCompactTimeline,
+  humanRequest,
+  onSubmitHumanResponse,
 }) => {
   return (
     <ScrollArea className="flex-grow h-0" ref={scrollAreaRef}>
@@ -93,6 +102,33 @@ export const ChatMessagesList: React.FC<ChatMessagesListProps> = ({
                   </div>
                 )
               )}
+            </div>
+          </div>
+        )}
+        
+        {/* Human Question Display - Simple AI Message Style */}
+        {humanRequest && onSubmitHumanResponse && (
+          <div className="flex items-start gap-3 mt-3">
+            <div className="relative group max-w-[85%] md:max-w-[80%] rounded-xl p-3 shadow-sm break-words bg-card text-card-foreground border border-border rounded-bl-none">
+              <div className="space-y-3">
+                <p className="text-foreground">{humanRequest.question.split('\n')[0]}</p>
+                
+                {/* Simple Option Buttons */}
+                {humanRequest.question.split('\n')
+                  .filter(line => /^\d+\.\s/.test(line.trim()))
+                  .map((line, index) => {
+                    const option = line.replace(/^\d+\.\s/, '').trim();
+                    return (
+                      <button
+                        key={index}
+                        onClick={() => onSubmitHumanResponse(option)}
+                        className="block w-full text-left px-3 py-2 text-sm bg-blue-600/10 hover:bg-blue-600/20 border border-blue-600/30 rounded-lg transition-colors text-blue-400"
+                      >
+                        {index + 1}. {option}
+                      </button>
+                    );
+                  })}
+              </div>
             </div>
           </div>
         )}

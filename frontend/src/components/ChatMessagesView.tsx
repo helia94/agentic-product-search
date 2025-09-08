@@ -1,7 +1,6 @@
 import type React from "react";
 import type { Message } from "@langchain/langgraph-sdk";
 import { InputForm } from "@/components/InputForm";
-import { HumanInteractionModal } from "@/components/HumanInteractionModal";
 import { ProcessedEvent } from "@/components/ActivityTimeline";
 import { HtmlRenderer, isHtmlContent } from "./chat/renderers";
 import { ChatPanels } from "./chat/layout";
@@ -68,49 +67,53 @@ export function ChatMessagesView({
   // If we have HTML result, show it full-screen with input below
   if (hasHtmlResult) {
     return (
-      <>
-        {/* Human Interaction Modal */}
-        {humanRequest && onSubmitHumanResponse && (
-          <HumanInteractionModal
-            question={humanRequest.question}
-            query={humanRequest.query}
-            onSubmit={onSubmitHumanResponse}
-            isVisible={true}
-          />
-        )}
-
-        <div className="flex flex-col h-full">
-          {/* Full-screen HTML content */}
-          <div className="flex-1 w-full h-full overflow-hidden">
-            <HtmlRenderer content={lastAiContent} />
-          </div>
-          
-          {/* Input form at the bottom */}
-          <div className="flex-shrink-0">
-            <InputForm
-              onSubmit={onSubmit}
-              isLoading={isLoading}
-              onCancel={onCancel}
-              hasHistory={messages.length > 0}
-            />
-          </div>
+      <div className="flex flex-col h-full">
+        {/* Full-screen HTML content */}
+        <div className="flex-1 w-full h-full overflow-hidden">
+          <HtmlRenderer content={lastAiContent} />
         </div>
-      </>
+        
+        {/* Human Question Display for HTML view */}
+        {humanRequest && onSubmitHumanResponse && (
+          <div className="flex-shrink-0 p-4 bg-gray-900/50 border-t border-gray-700">
+            <div className="max-w-2xl">
+              <p className="text-foreground mb-3">{humanRequest.question.split('\n')[0]}</p>
+              <div className="space-y-2">
+                {humanRequest.question.split('\n')
+                  .filter(line => /^\d+\.\s/.test(line.trim()))
+                  .map((line, index) => {
+                    const option = line.replace(/^\d+\.\s/, '').trim();
+                    return (
+                      <button
+                        key={index}
+                        onClick={() => onSubmitHumanResponse(option)}
+                        className="block w-full text-left px-3 py-2 text-sm bg-blue-600/10 hover:bg-blue-600/20 border border-blue-600/30 rounded-lg transition-colors text-blue-400"
+                      >
+                        {index + 1}. {option}
+                      </button>
+                    );
+                  })}
+              </div>
+            </div>
+          </div>
+        )}
+        
+        {/* Input form at the bottom */}
+        <div className="flex-shrink-0">
+          <InputForm
+            onSubmit={onSubmit}
+            isLoading={isLoading}
+            onCancel={onCancel}
+            hasHistory={messages.length > 0}
+            humanRequest={humanRequest}
+          />
+        </div>
+      </div>
     );
   }
 
   return (
     <>
-      {/* Human Interaction Modal */}
-      {humanRequest && onSubmitHumanResponse && (
-        <HumanInteractionModal
-          question={humanRequest.question}
-          query={humanRequest.query}
-          onSubmit={onSubmitHumanResponse}
-          isVisible={true}
-        />
-      )}
-
       <ChatPanels
         showThinkPanel={showThinkPanel}
         onToggleThinkPanel={toggleThinkPanel}
@@ -130,6 +133,8 @@ export function ChatMessagesView({
           handleCopy={handleCopy}
           copiedMessageId={copiedMessageId}
           showCompactTimeline={showThinkPanel}
+          humanRequest={humanRequest}
+          onSubmitHumanResponse={onSubmitHumanResponse}
         />
         
         <div className="flex-shrink-0">
@@ -138,6 +143,7 @@ export function ChatMessagesView({
             isLoading={isLoading}
             onCancel={onCancel}
             hasHistory={messages.length > 0}
+            humanRequest={humanRequest}
           />
         </div>
       </ChatPanels>
