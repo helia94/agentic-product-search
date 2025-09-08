@@ -14,13 +14,7 @@ import json
 import time
 import logging
 from pydantic import BaseModel, Field
-from agent.configuration.search_limits import (
-    SEARCH_LIMITS,
-    get_search_limit, 
-    generate_search_prompt_text, 
-    is_search_limit_reached,
-    ComponentNames
-)
+from agent.configuration.search_limits import ComponentNames
 
 
 # Base state that all search subgraphs will extend
@@ -41,10 +35,14 @@ class SearchConfig(BaseModel):
     state_field_mapping: Dict[str, str] = Field(description="Map template variables to state fields")
     component_name: str = Field(description="Component name for search limits (e.g. 'product_research')")
     
-    @property
-    def max_searches(self) -> int:
-        """Get max searches from centralized configuration"""
-        return get_search_limit(self.component_name)
+    def get_max_searches(self, search_limits) -> int:
+        """Get max searches from search_limits configuration"""
+        component_limits = {
+            "product_exploration": search_limits.product_exploration_max_searches,
+            "product_research": search_limits.product_research_max_searches, 
+            "final_product_info": search_limits.final_product_info_max_searches,
+        }
+        return component_limits.get(self.component_name, 3)
 
 
 class AnalysisResult(BaseModel):
@@ -241,26 +239,38 @@ def step2_generate_search_or_done(state: Dict[str, Any],
         else:
             serializable_tool_info.append(str(item))
 
-    # Check max searches limit using centralized configuration
-    if is_search_limit_reached(config.component_name, len(ai_queries)):
-        max_limit = get_search_limit(config.component_name)
+    # Get search_limits from state
+    search_limits = state.get("search_limits")
+    if not search_limits:
+        print(f"Warning: No search_limits found in state for {config.component_name}")
+        return None, serializable_tool_info
+    
+    # Check max searches limit using search_limits from state
+    max_limit = config.get_max_searches(search_limits)
+    if len(ai_queries) >= max_limit:
         print(f"Skipping search query generation, reached maximum number of queries ({max_limit}) for {config.component_name}")
         return None, serializable_tool_info
     
-    # Get concurrent search configuration
+    # Get concurrent search configuration from search_limits
     concurrent_configs = {
-        ComponentNames.PRODUCT_EXPLORATION: SEARCH_LIMITS.product_exploration_concurrent_searches,
-        ComponentNames.PRODUCT_RESEARCH: SEARCH_LIMITS.product_research_concurrent_searches,
-        ComponentNames.FINAL_PRODUCT_INFO: SEARCH_LIMITS.final_product_info_concurrent_searches,
+        ComponentNames.PRODUCT_EXPLORATION: search_limits.product_exploration_concurrent_searches,
+        ComponentNames.PRODUCT_RESEARCH: search_limits.product_research_concurrent_searches,
+        ComponentNames.FINAL_PRODUCT_INFO: search_limits.final_product_info_concurrent_searches,
     }
     concurrent_count = concurrent_configs.get(config.component_name, 3)  # Default fallback
+    
+    # Generate search limit text dynamically
+    if len(ai_queries) > 0:
+        search_limit_text = f"- Max {max_limit} searches for this task. You already used {len(ai_queries)} searches."
+    else:
+        search_limit_text = f"- Use a MAX of {max_limit} searches for this task, ideally fewer."
     
     # Your exact search context with dynamic search limit text and concurrent search info
     search_context = {
         "tool_saved_info": json.dumps(serializable_tool_info + result_tool_call_analysis),
         "ai_queries": json.dumps([msg.tool_calls[0].get("args", {}).get("query", "") for msg in ai_queries]),
         "len_ai_queries": len(ai_queries),
-        "search_limit_text": generate_search_prompt_text(config.component_name, len(ai_queries)),
+        "search_limit_text": search_limit_text,
         "concurrent_searches": concurrent_count,
     }
     

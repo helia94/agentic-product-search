@@ -15,7 +15,8 @@ from langchain_core.runnables import RunnableConfig
 from google.genai import Client
 import tiktoken  # Ensure tiktoken is installed in the environment
 
-from agent.graph.state_V2 import  ProductSimple, ProductSimpleList
+from agent.graph.state_V2 import ProductSimple, ProductSimpleList
+from agent.configuration.search_limits import SearchLimitsConfig
 from agent.configuration import Configuration
 
 from langchain_google_genai import ChatGoogleGenerativeAI
@@ -42,12 +43,9 @@ import json
 from langchain_core.messages import ToolMessage
 from langchain.globals import set_debug, set_verbose
 from agent.configuration.llm_setup import get_llm
-from agent.utils.tool_orchestrator import SimpleToolOrchestrator
+from agent.utils.tool_orchestrator import DynamicTavilyToolOrchestrator
 from agent.graph.search_pattern import BaseSearchState, execute_search_pattern_flexible, SearchConfig
-from agent.configuration.search_limits import (
-    SEARCH_LIMITS,
-    ComponentNames
-)
+from agent.configuration.search_limits import ComponentNames
 from langchain_tavily import TavilySearch
 from agent.graph.research_with_pattern import research_graph_with_pattern
 
@@ -65,6 +63,7 @@ class State(BaseSearchState):
     products: List[ProductSimple]
     research_results: List[str]
     effort: str  # "low", "medium", "high" - controls search configuration via SearchLimitsConfig
+    search_limits: SearchLimitsConfig
     
     # BaseSearchState provides:
     # ai_queries: Annotated[List[AIMessage], add_messages]
@@ -73,18 +72,13 @@ class State(BaseSearchState):
     # final_output: str
 
 # Create Tavily instance with centralized configuration
-def create_exploration_tavily():
-    """Create Tavily instance for product exploration with centralized config"""
-    tavily_config = SEARCH_LIMITS.product_exploration_tavily
-    return TavilySearch(
-        max_results=tavily_config.max_results,
-        include_answer=tavily_config.include_answer,
-        search_depth=tavily_config.search_depth
-    )
+# Dynamic tool orchestrator for product exploration
+tools_orchestrator = DynamicTavilyToolOrchestrator(
+    component_name=ComponentNames.PRODUCT_EXPLORATION,
+    input_field="ai_queries", 
+    output_field="tool_last_output"
+)
 
-# Tool setup with exploration-specific Tavily
-exploration_tavily = create_exploration_tavily()
-tools_setup = SimpleToolOrchestrator([exploration_tavily], "ai_queries", "tool_last_output")
 
 
 def create_product_explore_config() -> SearchConfig:
@@ -195,11 +189,12 @@ def chatbot_explore(state: State):
     Product exploration using the search pattern
     """
     config = create_product_explore_config()
+    search_limits = state.get("search_limits")
     
     return execute_search_pattern_flexible(
         state=state,
         llm=get_llm("search_pattern"),
-        llm_with_tools=tools_setup.bind_tools_to_llm(get_llm("pattern_tool_calls")),
+        llm_with_tools=tools_orchestrator.bind_tools_to_llm(get_llm("pattern_tool_calls"), search_limits),
         config=config
     )
 
@@ -208,7 +203,7 @@ def chatbot_explore(state: State):
 
 def route_tools(state: State):
     """Route based on ai_queries for search pattern"""
-    return tools_setup.router("tools")(state)
+    return tools_orchestrator.router("tools")(state)
 
 
 def format_products(state: State):
@@ -294,8 +289,11 @@ def call_product_research_tool(state: State):
 
 graph_builder = StateGraph(State)
 
-# Use new tool orchestration
-tool_node_explore = tools_setup.tool_node()
+# Dynamic tool node that creates tools based on search_limits from state
+def tool_node_explore(state: State):
+    """Tool node that creates tools dynamically based on search_limits from state"""
+    search_limits = state.get("search_limits")
+    return tools_orchestrator.tool_node(search_limits)(state)
 
 graph_builder.add_node("tools_explore", tool_node_explore)  # Renamed to match router expectation
 graph_builder.add_node("chatbot_explore", chatbot_explore)

@@ -7,7 +7,6 @@ across different graph components, ensuring consistency between prompts and hard
 
 from typing import Dict, Any, Optional
 from pydantic import BaseModel, Field
-global SEARCH_LIMITS
 
 class TavilyConfig(BaseModel):
     """Configuration for Tavily search parameters"""
@@ -52,9 +51,9 @@ class Low(SearchLimitsConfig):
     max_research_products: int = 1
     max_explore_queries: int = 3
     
-    product_exploration_concurrent_searches: int = 1
-    product_research_concurrent_searches: int = 2
-    final_product_info_concurrent_searches: int = 2
+    product_exploration_concurrent_searches: int = 3
+    product_research_concurrent_searches: int = 3
+    final_product_info_concurrent_searches: int = 3
     
     product_exploration_tavily: TavilyConfig = Field(default_factory=lambda: TavilyConfig(max_results=2, include_answer=False, search_depth="basic"))
     product_research_tavily: TavilyConfig = Field(default_factory=lambda: TavilyConfig(max_results=2, include_answer=True, search_depth="basic"))
@@ -68,7 +67,7 @@ class Medium(SearchLimitsConfig):
     product_research_max_searches: int = 5
     final_product_info_max_searches: int = 8
     
-    max_explore_products: int = 4
+    max_explore_products: int = 6
     max_research_products: int = 3
     max_explore_queries: int = 5
     
@@ -96,40 +95,13 @@ class High(SearchLimitsConfig):
     product_research_concurrent_searches: int = 5
     final_product_info_concurrent_searches: int = 5
     
-    product_exploration_tavily: TavilyConfig = Field(default_factory=lambda: TavilyConfig(max_results=5, include_answer=False, search_depth="basic"))
+    product_exploration_tavily: TavilyConfig = Field(default_factory=lambda: TavilyConfig(max_results=20, include_answer=False, search_depth="basic"))
     product_research_tavily: TavilyConfig = Field(default_factory=lambda: TavilyConfig(max_results=20, include_answer=True, search_depth="advanced"))
-    final_product_info_tavily: TavilyConfig = Field(default_factory=lambda: TavilyConfig(max_results=10, include_answer=True, search_depth="advanced"))
+    final_product_info_tavily: TavilyConfig = Field(default_factory=lambda: TavilyConfig(max_results=20, include_answer=True, search_depth="advanced"))
 
 
 
-# Convenience functions for backward compatibility
-def get_search_limit(component_name: str, search_limits) -> int:
-    """Get the search limit for a component - DEPRECATED: use SEARCH_LIMITS attributes directly"""
-    component_limits = {
-        "product_exploration": search_limits.product_exploration_max_searches,
-        "product_research": search_limits.product_research_max_searches, 
-        "final_product_info": search_limits.final_product_info_max_searches,
-    }
-    return component_limits.get(component_name, 3)
-
-def generate_search_prompt_text(component_name: str, current_searches: int = 0) -> str:
-    """Generate prompt text about search limits - DEPRECATED: use SEARCH_LIMITS attributes directly"""
-    max_searches = get_search_limit(component_name)
-    
-    if current_searches > 0:
-        return f"- Max {max_searches} searches for this task. You already used {current_searches} searches."
-    else:
-        return f"- Use a MAX of {max_searches} searches for this task, ideally fewer."
-
-def is_search_limit_reached(component_name: str, current_searches: int) -> bool:
-    """Check if search limit is reached - DEPRECATED: use SEARCH_LIMITS attributes directly"""
-    max_searches = get_search_limit(component_name)
-    return current_searches >= max_searches
-
-def get_remaining_searches(component_name: str, current_searches: int) -> int:
-    """Get remaining searches - DEPRECATED: use SEARCH_LIMITS attributes directly"""
-    max_searches = get_search_limit(component_name)
-    return max(0, max_searches - current_searches)
+# Global instance removed - use map_to_search_limits() to get configuration based on effort level
 
 
 
@@ -148,6 +120,4 @@ def map_to_search_limits(effort: str) -> SearchLimitsConfig:
     }
     return effort_map.get(effort.lower()) 
 
-def set_search_effort_limits(state):
-    global SEARCH_LIMITS
-    SEARCH_LIMITS = map_to_search_limits(state.get("effort", "low"))
+# Function removed - search limits are now managed through the LangGraph state

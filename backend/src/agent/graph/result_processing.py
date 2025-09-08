@@ -6,7 +6,6 @@ from pydantic import BaseModel, Field
 
 from agent.graph.state_V2 import OverallState
 from agent.configuration.llm_setup import get_llm
-from agent.configuration.search_limits import SEARCH_LIMITS
 from agent.tracing.node_progress import track_node_progress
 from langchain_core.runnables import RunnableConfig
 
@@ -103,7 +102,7 @@ def select_final_products(state: OverallState, config: RunnableConfig = None) ->
     """
 
     
-    max_products_to_show = SEARCH_LIMITS.max_research_products
+    max_products_to_show = state.get("search_limits").max_research_products
     instructions = instructions.format(
         query=query_str,
         max_products_to_show=max_products_to_show,

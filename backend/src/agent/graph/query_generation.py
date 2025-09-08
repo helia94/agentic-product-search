@@ -3,7 +3,6 @@ from langchain_core.runnables import RunnableConfig
 from agent.graph.state_V2 import OverallState, Queries
 from agent.configuration import Configuration
 from agent.configuration.llm_setup import get_llm
-from agent.configuration.search_limits import SEARCH_LIMITS
 from agent.tracing.node_progress import track_node_progress
 
 @track_node_progress("query_generator")
@@ -69,7 +68,7 @@ def query_generator(state: OverallState, config: RunnableConfig) -> OverallState
         I want to buy {product} for {use_case}, and I have these criteria in mind: {criteria}. And these conditions: {conditions}. out put maximum of {max_explore_queries} queries.
     """
     
-    max_explore_queries = SEARCH_LIMITS.max_explore_queries
+    max_explore_queries = state.get("search_limits").max_explore_queries
     formatted_prompt = instructions.format(
         product=product,
         use_case=use_case,

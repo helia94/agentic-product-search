@@ -20,9 +20,9 @@ load_dotenv()
 
 from agent.graph.state_V2 import ProductSimple
 from agent.configuration.llm_setup import get_llm
-from agent.utils.tool_orchestrator import SimpleToolOrchestrator
+from agent.utils.tool_orchestrator import DynamicTavilyToolOrchestrator
 from agent.graph.search_pattern import BaseSearchState, execute_search_pattern_flexible
-from agent.configuration.search_limits import SEARCH_LIMITS, ComponentNames
+from agent.configuration.search_limits import ComponentNames, SearchLimitsConfig
 from langchain_tavily import TavilySearch
 
 from langchain.globals import set_debug
@@ -36,6 +36,7 @@ class ProductResearchState(BaseSearchState):
     query: str
     criteria: List[str]
     product: ProductSimple
+    search_limits: SearchLimitsConfig
     
     # BaseSearchState provides:
     # ai_queries: Annotated[List[AIMessage], add_messages]
@@ -43,19 +44,12 @@ class ProductResearchState(BaseSearchState):
     # tool_last_output: List[AIMessage]
     # final_output: str
 
-# Create Tavily instance with centralized configuration
-def create_research_tavily():
-    """Create Tavily instance for product research with centralized config"""
-    tavily_config = SEARCH_LIMITS.product_research_tavily
-    return TavilySearch(
-        max_results=tavily_config.max_results,
-        include_answer=tavily_config.include_answer,
-        search_depth=tavily_config.search_depth
-    )
-
-# Tool setup with research-specific Tavily
-research_tavily = create_research_tavily()
-tools_setup = SimpleToolOrchestrator([research_tavily])
+# Dynamic tool orchestrator for product research
+tools_orchestrator = DynamicTavilyToolOrchestrator(
+    component_name=ComponentNames.PRODUCT_RESEARCH,
+    input_field="ai_queries", 
+    output_field="tool_last_output"
+)
 
 
 
@@ -184,12 +178,13 @@ def chatbot_research_with_pattern(state: ProductResearchState):
     
     # Create config with your exact prompts and state mapping
     config = create_product_research_config()
+    search_limits = state.get("search_limits")
     
     # Execute the 3-step pattern with your exact logic
     return execute_search_pattern_flexible(
         state=state,
         llm=get_llm("search_pattern"),
-        llm_with_tools=tools_setup.bind_tools_to_llm(get_llm("pattern_tool_calls")),
+        llm_with_tools=tools_orchestrator.bind_tools_to_llm(get_llm("pattern_tool_calls"), search_limits),
         config=config
     )
 
@@ -201,15 +196,20 @@ def route_tools(state: ProductResearchState):
     if ai_queries:
         print(f"[DEBUG] Last ai_query has tool_calls: {hasattr(ai_queries[-1], 'tool_calls') and len(ai_queries[-1].tool_calls) > 0}")
     
-    result = tools_setup.router("tools")(state)
+    result = tools_orchestrator.router("tools")(state)
     print(f"[DEBUG] route_tools returning: {result}")
     return result
 
 
+# Tool node function that creates tools dynamically
+def tool_node_research(state: ProductResearchState):
+    """Tool node that creates tools dynamically based on search_limits from state"""
+    search_limits = state.get("search_limits")
+    return tools_orchestrator.tool_node(search_limits)(state)
+
 # Your exact graph structure - cleaned up
 def create_research_graph():
     graph_builder = StateGraph(ProductResearchState)
-    tool_node_research = tools_setup.tool_node()
 
     graph_builder.add_node("tool_node_research", tool_node_research)
     graph_builder.add_node("chatbot_research", chatbot_research_with_pattern)  # Only change: use pattern

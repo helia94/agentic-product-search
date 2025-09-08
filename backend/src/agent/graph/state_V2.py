@@ -11,7 +11,7 @@ import operator
 from dataclasses import dataclass, field
 from pydantic import BaseModel, Field
 
-from backend.build.lib.agent.search_limits import SearchLimitsConfig
+from agent.configuration.search_limits import SearchLimitsConfig
 
 
 

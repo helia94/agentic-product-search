@@ -20,12 +20,9 @@ load_dotenv()
 from langchain.globals import set_debug, set_verbose
 from agent.graph.state_V2 import ProductFull
 from agent.configuration.llm_setup import get_llm
-from agent.utils.tool_orchestrator import SimpleToolOrchestrator
+from agent.utils.tool_orchestrator import DynamicTavilyToolOrchestrator
 from agent.graph.search_pattern import BaseSearchState, execute_search_pattern_flexible, SearchConfig
-from agent.configuration.search_limits import (
-    SEARCH_LIMITS,
-    ComponentNames
-)
+from agent.configuration.search_limits import ComponentNames, SearchLimitsConfig
 from langchain_tavily import TavilySearch
 
 #set_debug(True)
@@ -38,6 +35,7 @@ class FinalInfoState(BaseSearchState):
     product: dict  # ProductSimple with basic info (name, criteria, USP, use_case)
     product_output_string: str
     product_output_formatted: ProductFull
+    search_limits: SearchLimitsConfig
     
     # BaseSearchState provides:
     # ai_queries: Annotated[List[AIMessage], add_messages]
@@ -46,19 +44,12 @@ class FinalInfoState(BaseSearchState):
     # final_output: str
 
 
-# Create Tavily instance with centralized configuration
-def create_final_info_tavily():
-    """Create Tavily instance for final product info with centralized config"""
-    tavily_config = SEARCH_LIMITS.final_product_info_tavily
-    return TavilySearch(
-        max_results=tavily_config.max_results,
-        include_answer=tavily_config.include_answer,
-        search_depth=tavily_config.search_depth
-    )
-
-# Tool setup with final-info-specific Tavily
-final_info_tavily = create_final_info_tavily()
-tools_setup = SimpleToolOrchestrator([final_info_tavily])
+# Dynamic tool orchestrator for final product info
+tools_orchestrator = DynamicTavilyToolOrchestrator(
+    component_name=ComponentNames.FINAL_PRODUCT_INFO,
+    input_field="ai_queries", 
+    output_field="tool_last_output"
+)
 
 
 def create_final_info_config() -> SearchConfig:
@@ -241,19 +232,20 @@ def chatbot_research_with_pattern(state: FinalInfoState):
     
     # Create config with the final info completion prompts
     config = create_final_info_config()
+    search_limits = state.get("search_limits")
     
     # Execute the 3-step pattern
     return execute_search_pattern_flexible(
         state=state,
         llm=get_llm("search_pattern"),
-        llm_with_tools=tools_setup.bind_tools_to_llm(get_llm("pattern_tool_calls")),
+        llm_with_tools=tools_orchestrator.bind_tools_to_llm(get_llm("pattern_tool_calls"), search_limits),
         config=config
     )
 
 
 def route_tools(state: FinalInfoState):
     """Simple routing logic"""
-    return tools_setup.router("tools")(state)
+    return tools_orchestrator.router("tools")(state)
 
 
 def validate_and_fix_json(state: FinalInfoState):
@@ -338,11 +330,16 @@ def print_node(state: FinalInfoState):
 
 
 # Graph construction using the pattern
+# Tool node function that creates tools dynamically
+def tool_node_final_info(state: FinalInfoState):
+    """Tool node that creates tools dynamically based on search_limits from state"""
+    search_limits = state.get("search_limits")
+    return tools_orchestrator.tool_node(search_limits)(state)
+
 def create_final_info_graph():
     graph_builder = StateGraph(FinalInfoState)
-    tool_node_research = tools_setup.tool_node()
 
-    graph_builder.add_node("tool_node_final_info", tool_node_research)
+    graph_builder.add_node("tool_node_final_info", tool_node_final_info)
     graph_builder.add_node("final_info_chatbot", chatbot_research_with_pattern)
     graph_builder.add_node("format_final_info", validate_and_fix_json)
 

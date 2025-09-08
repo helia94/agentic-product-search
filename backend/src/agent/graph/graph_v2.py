@@ -16,7 +16,7 @@ from agent.graph.product_orchestration import call_product_search_graph, complet
 from agent.graph.result_processing import save_results_to_disk, select_final_products
 from agent.graph.html_generation import generate_html_results
 from agent.configuration import Configuration
-from agent.configuration.search_limits import set_search_effort_limits, SEARCH_LIMITS
+from agent.configuration.search_limits import map_to_search_limits
 
 
 
@@ -31,9 +31,9 @@ builder = StateGraph(OverallState, config_schema=Configuration)
 
 def configure_search_effort(state: OverallState) -> OverallState:
     """Configure search limits based on the effort level in the state"""
-    set_search_effort_limits(state)
+    search_limits = map_to_search_limits(state.get("effort", "low"))
     return {
-        "search_limits": SEARCH_LIMITS
+        "search_limits": search_limits
     }
 
 
