@@ -3,8 +3,7 @@ import { InputForm } from "./InputForm";
 interface WelcomeScreenProps {
   handleSubmit: (
     submittedInputValue: string,
-    effort: string,
-    model: string
+    effort: string
   ) => void;
   onCancel: () => void;
   isLoading: boolean;

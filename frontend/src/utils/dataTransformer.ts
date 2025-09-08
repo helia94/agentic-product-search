@@ -131,7 +131,7 @@ export function transformEventsToHierarchy(
   result.tasks = buildTaskDetails(events, latestState);
   
   // 3. Determine current task and overall status
-  result.currentTaskId = getCurrentTaskId(events, latestState);
+  result.currentTaskId = getCurrentTaskId(latestState);
   result.overallStatus = determineOverallStatus(events);
 
   return result;
@@ -188,7 +188,7 @@ function buildTaskDetails(events: EventData[], state: StateData): TaskDetail[] {
     // Build task steps - build steps for all tasks, not just current task
     const shouldShowSteps = index <= currentPointer;
     console.log(`📋 Task ${index} status: ${taskStatus}, Should show steps: ${shouldShowSteps}`);
-    const steps = buildTaskSteps(events, state, taskId, shouldShowSteps);
+    const steps = buildTaskSteps(events, taskId, shouldShowSteps);
     console.log(`📋 Task ${index} built ${steps.length} steps`);
 
     return {
@@ -205,7 +205,6 @@ function buildTaskDetails(events: EventData[], state: StateData): TaskDetail[] {
  */
 function buildTaskSteps(
   events: EventData[], 
-  state: StateData, 
   taskId: string, 
   shouldShowSteps: boolean // Show steps for current task or completed tasks
 ): TaskStep[] {
@@ -471,7 +470,7 @@ function buildTaskSteps(
 /**
  * 获取当前任务ID
  */
-function getCurrentTaskId(events: EventData[], state: StateData): string | null {
+function getCurrentTaskId(state: StateData): string | null {
   const plan = state.plan || [];
   const currentPointer = state.current_task_pointer || 0;
   

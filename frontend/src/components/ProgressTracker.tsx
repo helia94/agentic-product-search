@@ -139,8 +139,8 @@ export const ProgressTracker: React.FC<ProgressTrackerProps> = ({
   const nodeList = Array.from(nodeStates.entries())
     .map(([key, state]) => {
       const event = state.error || state.ended || state.started;
-      const isActive = state.started && !state.ended && !state.error;
-      const isCompleted = state.ended || state.error;
+      const isActive = Boolean(state.started && !state.ended && !state.error);
+      const isCompleted = Boolean(state.ended || state.error);
       
       return {
         key,

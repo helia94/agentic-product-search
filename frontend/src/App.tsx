@@ -224,7 +224,7 @@ export default function App() {
 
 
   const handleSubmit = useCallback(
-    (submittedInputValue: string, effort: string, model: string) => {
+    (submittedInputValue: string, effort: string) => {
       if (!submittedInputValue.trim()) return;
       
       const newMessages: Message[] = [
@@ -238,7 +238,7 @@ export default function App() {
       thread.submit({
         messages: newMessages,
         effort: effort,
-        reasoning_model: model,
+        reasoning_model: "claude-3.5-sonnet",
       });
     },
     [thread]
