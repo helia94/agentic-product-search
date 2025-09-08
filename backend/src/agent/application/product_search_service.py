@@ -79,23 +79,23 @@ class ProductSearchService:
                         return
                     if chunk:                      # chunk is the FULL state dict
                         result_state = chunk       # last chunk == final state
+                        
+                        # Check if human input is needed and interrupt execution
+                        if result_state.get("awaiting_human") and result_state.get("human_question"):
+                            print(f"[SEARCH] Human input needed for job {job_id}, interrupting execution")
+                            await self.job_repository.update_job_status(
+                                job_id,
+                                "awaiting_human_input",
+                                awaiting_human=True,
+                                human_question=result_state["human_question"],
+                                current_state=result_state
+                            )
+                            return  # Exit early, wait for human response
             finally:
                 await self.job_repository.remove_job_event(job_id)
 
             print(f"[SEARCH] Graph execution completed for job {job_id}")
             print(f"[SEARCH] Result state keys: {list(result_state.keys()) if result_state else 'None'}")
-
-            
-            # Check if human input is needed
-            if result_state and result_state.get("awaiting_human") and result_state.get("human_question"):
-                await self.job_repository.update_job_status(
-                    job_id,
-                    "awaiting_human_input",
-                    awaiting_human=True,
-                    human_question=result_state["human_question"],
-                    current_state=result_state
-                )
-                return  # Wait for human response
             
             # Process successful completion
             if result_state:
@@ -152,8 +152,16 @@ class ProductSearchService:
             # Resume from human_ask_for_use_case node
             await self.job_repository.update_job_status(job_id, "resuming_after_human_input")
             
-            # Continue graph execution with progress tracking
-            result_state = self.tracked_graph.invoke(current_state, config, job_id)
+            # Continue graph execution with progress tracking using astream
+            result_state = {}
+            async for chunk in self.tracked_graph.astream(
+                current_state,
+                config=config,
+                job_id=job_id,
+                stream_mode="values"
+            ):
+                if chunk:
+                    result_state = chunk
             
             # Check if HTML was generated
             html_file_path = result_state.get("html_file_path")
