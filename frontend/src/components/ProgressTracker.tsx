@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -90,6 +90,20 @@ export const ProgressTracker: React.FC<ProgressTrackerProps> = ({
   onStop,
   isStoppable = false
 }) => {
+  const scrollAreaRef = useRef<HTMLDivElement>(null);
+
+  // Auto-scroll to bottom when new progress events come in
+  useEffect(() => {
+    if (scrollAreaRef.current) {
+      const scrollViewport = scrollAreaRef.current.querySelector(
+        "[data-radix-scroll-area-viewport]"
+      );
+      if (scrollViewport) {
+        scrollViewport.scrollTop = scrollViewport.scrollHeight;
+      }
+    }
+  }, [progressEvents]);
+
   // Group events by node to track start/end pairs
   const nodeStates = new Map<string, {
     started: NodeProgressEvent | null;
@@ -180,7 +194,7 @@ export const ProgressTracker: React.FC<ProgressTrackerProps> = ({
         </div>
       </CardHeader>
       <CardContent>
-        <ScrollArea className="h-64 w-full">
+        <ScrollArea className="h-64 w-full" ref={scrollAreaRef}>
           <div className="space-y-2">
             {nodeList.length === 0 ? (
               <div className="text-gray-400 text-center py-4">
