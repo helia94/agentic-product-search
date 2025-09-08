@@ -70,13 +70,13 @@ class TrackedGraphExecutor:
             print(f"Async graph execution error for job {job_id}: {e}")
             raise
     
-    async def astream(self, initial_state: Dict[str, Any], config: Dict[str, Any], job_id: str):
+    async def astream(self, initial_state: Dict[str, Any], config: Dict[str, Any], job_id: str, **kwargs,):
         """
         Async streaming version with cancellation support.
         """
         try:
             # Stream the graph execution
-            async for chunk in self.graph.astream(initial_state, config=config):
+            async for chunk in self.graph.astream(initial_state, config=config, **kwargs):
                 yield chunk
         except Exception as e:
             print(f"Async streaming error for job {job_id}: {e}")

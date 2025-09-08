@@ -45,7 +45,7 @@ builder.add_node("call_product_search_graph", call_product_search_graph, cache_p
 builder.add_node("complete_product_info", complete_product_info, cache_policy=CachePolicy(ttl=TTL, key_func=_key("selected_product_ids", "criteria")))
 builder.add_node("select_final_products", select_final_products, cache_policy=CachePolicy(ttl=TTL, key_func=_key("explored_products", "criteria")))
 builder.add_node("save_results_to_disk", save_results_to_disk)
-builder.add_node("generate_html_results", generate_html_results, cache_policy=CachePolicy(ttl=TTL, key_func=_key("selected_products", "selected_criteria")))
+builder.add_node("generate_html_results", generate_html_results, cache_policy=CachePolicy(ttl=TTL, key_func=_key("completed_products")))
 print("[GRAPH] All nodes wrapped with progress tracking")
 
 
@@ -66,9 +66,9 @@ builder.add_edge("find_criteria", "query_generator")
 builder.add_edge("query_generator", "call_product_search_graph")
 builder.add_edge("call_product_search_graph", "select_final_products")
 builder.add_edge("select_final_products", "complete_product_info")
-builder.add_edge("complete_product_info", "save_results_to_disk")
-builder.add_edge("save_results_to_disk", "generate_html_results")
-builder.add_edge("generate_html_results", END)
+builder.add_edge("complete_product_info", "generate_html_results")
+builder.add_edge("generate_html_results", "save_results_to_disk")
+builder.add_edge("save_results_to_disk", END)
 
 
 # For now, compile without checkpointer - we'll handle checkpointing in the execution layer

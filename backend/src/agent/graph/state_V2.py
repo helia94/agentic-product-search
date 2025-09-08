@@ -140,6 +140,7 @@ class OverallState(TypedDict):
     max_explore_products: int
     max_research_products: int
     max_explore_queries: int
+    html_file_path: str
     
     # Human interaction fields
     human_question: Optional[str]  # Question to ask the user

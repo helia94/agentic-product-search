@@ -64,27 +64,27 @@ class ProductSearchService:
                 return
             
             print(f"[SEARCH] Starting tracked graph execution for job {job_id}")
-            
-            # Execute graph with cancellation support
-            result_state = initial_state.copy()  # Start with initial state
+                        
+            result_state = {}
             try:
-                # Use astream to get chunks and check for cancellation
-                async for chunk in self.tracked_graph.astream(initial_state, config, job_id):
-                    # Check if cancellation was requested
+                async for chunk in self.tracked_graph.astream(
+                    initial_state,
+                    config=config,
+                    job_id=job_id,
+                    stream_mode="values",   # <-- full state after each step
+                ):
                     if stop_event.is_set():
                         print(f"[SEARCH] Graph execution cancelled for job {job_id}")
                         await self.job_repository.update_job_status(job_id, "cancelled")
                         return
-                    
-                    # Accumulate the state from each chunk
-                    if chunk:
-                        result_state.update(chunk)
+                    if chunk:                      # chunk is the FULL state dict
+                        result_state = chunk       # last chunk == final state
             finally:
-                # Clean up the stop event
                 await self.job_repository.remove_job_event(job_id)
-            
+
             print(f"[SEARCH] Graph execution completed for job {job_id}")
             print(f"[SEARCH] Result state keys: {list(result_state.keys()) if result_state else 'None'}")
+
             
             # Check if human input is needed
             if result_state and result_state.get("awaiting_human") and result_state.get("human_question"):
@@ -106,11 +106,11 @@ class ProductSearchService:
                     filename = pathlib.Path(html_file_path).name
                     await self.job_repository.update_job_status(
                         job_id,
-                        "completed",
+                        f"completed",
                         html_file_path=filename
                     )
                 else:
-                    await self.job_repository.update_job_status(job_id, "completed")
+                    await self.job_repository.update_job_status(job_id, f"completed")
             else:
                 await self.job_repository.update_job_status(
                     job_id, 
