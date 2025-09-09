@@ -16,10 +16,7 @@ FINAL_INFO_ANALYZE_PROMPT = """
         "reviews_count": "ALL review count information from all sources.",
         "image_url": "ALL image URLs found, preserve all sources.",
         "product_url": "ALL retailer links and purchasing information found."
-        ANY other information found - preserve everything.
-
-        Preserve ALL factual data found, maintain complete context and details.
-        Return comprehensive insights preserving ALL information as complete detailed strings.
+        ANY other nuance information found about this product that is not already in the product data.
         </INSTRUCTIONS>
 
         <INPUT>

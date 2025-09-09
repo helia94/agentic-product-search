@@ -29,6 +29,7 @@ from langchain.globals import set_debug
 from agent.prompts.deep_search.deep_search_analyze_prompt import DEEP_SEARCH_ANALYZE_PROMPT
 from agent.prompts.deep_search.deep_search_format_prompt import DEEP_SEARCH_FORMAT_PROMPT
 from agent.prompts.deep_search.deep_search_search_prompt import DEEP_SEARCH_SEARCH_PROMPT
+from agent.configuration.search_limits import Low
 set_debug(True)
 
 
@@ -151,7 +152,8 @@ if __name__ == "__main__":
             "USP": "GPS, Google, ECG",
             "use_case": "Serious fitness tracking",
             "other_info": "40+ modes, 7-day battery, $160"
-        }
+        },
+        "search_limits": Low(),
     }):
         print("Event", event.keys())
         

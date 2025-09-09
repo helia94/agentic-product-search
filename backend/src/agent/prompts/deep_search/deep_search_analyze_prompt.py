@@ -18,9 +18,6 @@ DEEP_SEARCH_ANALYZE_PROMPT = """
         - Cross-reference findings with user reviews and expert opinions, preserving complete details and context.
         - Highlight any discrepancies or uncertainties with full context and supporting evidence.
         - Preserve ALL specific data points: numbers, measurements, user quotes, expert statements, test results, etc.
-
-        Return your output using this format:
-            List[str] - Each string should contain comprehensive information preserving ALL details found
         </INSTRUCTIONS>
 
         <INPUT>

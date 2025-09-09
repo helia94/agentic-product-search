@@ -48,13 +48,15 @@ def get_tavily_tool(max_results: int, include_answer: bool) -> TavilySearch:
 
 def create_component_tavily_tool(search_limits, component_name: str) -> TavilySearch:
     """Create appropriate Tavily tool for a specific component based on search_limits"""
-    tavily_configs = {
-        "product_exploration": search_limits.product_exploration_tavily,
-        "product_research": search_limits.product_research_tavily,
-        "final_product_info": search_limits.final_product_info_tavily,
-    }
-    
-    config = tavily_configs.get(component_name)
+    match component_name:
+        case "product_exploration":
+            config = search_limits.product_exploration_tavily
+        case "product_research":
+            config = search_limits.product_research_tavily
+        case "final_product_info":
+            config = search_limits.final_product_info_tavily
+        case _:
+            config = None
     if not config:
         # Default fallback
         return get_tavily_tool(5, False)

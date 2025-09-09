@@ -19,7 +19,6 @@ EXPLORE_ANALYZE_PROMPT = """
         
         <INPUT>
         query: {query}
-        queries_remaining: {queries}
         last_tool_call_arguments: {last_tool_call_arguments}
         last_tool_call_output: {last_tool_call_output}
         max_products: {max_explore_products}

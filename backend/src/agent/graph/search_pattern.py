@@ -15,15 +15,16 @@ import time
 import logging
 from pydantic import BaseModel, Field
 from agent.configuration.search_limits import ComponentNames
+from agent.citation.document import Document, DocumentStore, SourcedFact, SourcedFactsList, reduce_documents
 
 
 # Base state that all search subgraphs will extend
 class BaseSearchState(TypedDict):
     """Base state for all search patterns - your exact structure"""
     ai_queries: Annotated[List[AIMessage], add_messages]
-    tool_saved_info: Annotated[List[str], add_messages]
+    tool_saved_info: Annotated[DocumentStore, reduce_documents]
     tool_last_output: List[AIMessage]
-    final_output: str
+    final_output: DocumentStore
     last_tool_call_count: int  # Track how many tool calls were made in the last step
 
 
@@ -124,26 +125,21 @@ def retry_llm_tool_call(llm_with_tools, formatted_prompt: str, max_retries: int 
                 if attempt == 0:
                     # First retry: Add explicit instructions about parameter types
                     retry_prompt = formatted_prompt + """\n\nIMPORTANT: When calling tools:
-- Use boolean values (true/false), NOT strings ("true"/"false")
-- Only use valid tool parameters
-- For TavilySearch: valid boolean params are include_answer, include_raw_content, include_images, include_image_descriptions
-- Example: {"query": "search term", "include_images": true}"""
+                    - Use boolean values (true/false), NOT strings ("true"/"false")
+                    - Only use valid tool parameters
+                    - For TavilySearch: valid boolean params are include_answer, include_raw_content, include_images, include_image_descriptions
+                    - Example: {"query": "search term", "include_images": true}"""
                     
                 elif attempt == 1:
                     # Second retry: Use basic search only
                     retry_prompt = f"""Based on this context, generate a simple web search query using only the 'query' parameter.
                     
-Context: {formatted_prompt[:1000]}
+                        Context: {formatted_prompt}
 
-Generate a Tavily search tool call with ONLY the query parameter. Example:
-{{"query": "your search term here"}}
+                        Generate a Tavily search tool call with ONLY the query parameter. Example:
+                        {{"query": "your search term here"}}
 
-Do not use any other parameters like include_images, search_depth, etc."""
-                
-                else:
-                    # Final retry: Most basic possible search
-                    retry_prompt = "Generate a simple web search about the topic using only: {\"query\": \"search term\"}"
-                
+                        Do not use any other parameters like include_images, search_depth, etc."""
                 formatted_prompt = retry_prompt
                 
                 # Exponential backoff
@@ -178,7 +174,7 @@ def step1_analyze_last_tool_call(state: Dict[str, Any],
     
     if not tool_last_output_list:
         print("no last tool call outputs, skipping analysis")
-        return []
+        return DocumentStore()
         
     # Get the exact number of tool call outputs from the last step
     recent_outputs = tool_last_output_list[-last_tool_call_count:] if len(tool_last_output_list) >= last_tool_call_count else tool_last_output_list
@@ -202,14 +198,19 @@ def step1_analyze_last_tool_call(state: Dict[str, Any],
             tool_arguments.append("No tool call arguments found")
     
     # Process multiple outputs
-    for i, output in enumerate(recent_outputs):
-        content = output.content if hasattr(output, 'content') else str(output)
-        tool_outputs.append(f"Result {i+1}: {content}")
-    
+    print(f"Recent tool call outputs: {[r.content for r in recent_outputs]}")
+    print(f"Recent tool call outputs (parsed): {[json.loads(r.content) for r in recent_outputs]}")
+
+    documents = [DocumentStore.add_documents_from_tavily(json.loads(r.content)) for r in recent_outputs]
+    documents = DocumentStore.merge(documents)
+
+    print(f"Created DocumentStore {documents} ")
+    print(f"Document contents: {documents.get_document_content_as_str()}")
+
     # Your exact tool call context but for multiple calls
     tool_context = {
         "last_tool_call_arguments": json.dumps(tool_arguments),
-        "last_tool_call_output": " | ".join(tool_outputs),
+        "last_tool_call_output": documents.get_document_content_as_str(),
     }
     
     # Apply configurable state mapping
@@ -217,39 +218,42 @@ def step1_analyze_last_tool_call(state: Dict[str, Any],
     
     # Your exact prompt formatting and LLM call
     formatted_prompt = config.analyze_prompt.format(**format_context)
-    result = llm.invoke(formatted_prompt)
-    return [result.content]
+
+    output_format_prompt = """
+    All returned insights should have citations to the source documents. Document all have after their content [ref:document_id].
+    Return you output as a list of Facts. Each fact has content write as instructed in the beginning of the prompt, and a document_id field with the source document id.
+    """
+
+    llm_with_format = llm.with_structured_output(SourcedFactsList)
+    result = llm_with_format.invoke(formatted_prompt + output_format_prompt) 
+    documents = documents.recreate_from_sourced_facts(result)
+    return documents
 
 def step2_generate_search_or_done(state: Dict[str, Any],
-                                 result_tool_call_analysis: List[str],
+                                 result_tool_call_analysis: DocumentStore,
                                  llm_with_tools,
                                  config: SearchConfig):
     """
     Step 2: Send new query or done - your exact logic with configurable state mapping
     """
     
-    tool_saved_info = state.get("tool_saved_info", [])
+    tool_saved_info = state.get("tool_saved_info", DocumentStore())
+    if not tool_saved_info:
+        tool_saved_info = DocumentStore()
     ai_queries = state.get("ai_queries", [])
     
-    # Your exact serialization logic
-    serializable_tool_info = []
-    for item in tool_saved_info:
-        if hasattr(item, 'content'):
-            serializable_tool_info.append(item.content)
-        else:
-            serializable_tool_info.append(str(item))
-
+    
     # Get search_limits from state
     search_limits = state.get("search_limits")
     if not search_limits:
         print(f"Warning: No search_limits found in state for {config.component_name}")
-        return None, serializable_tool_info
+        return None, tool_saved_info
     
     # Check max searches limit using search_limits from state
     max_limit = config.get_max_searches(search_limits)
     if len(ai_queries) >= max_limit:
         print(f"Skipping search query generation, reached maximum number of queries ({max_limit}) for {config.component_name}")
-        return None, serializable_tool_info
+        return None, tool_saved_info
     
     # Get concurrent search configuration from search_limits
     concurrent_configs = {
@@ -267,7 +271,7 @@ def step2_generate_search_or_done(state: Dict[str, Any],
     
     # Your exact search context with dynamic search limit text and concurrent search info
     search_context = {
-        "tool_saved_info": json.dumps(serializable_tool_info + result_tool_call_analysis),
+        "tool_saved_info": json.dumps(tool_saved_info.get_document_content_as_str() + result_tool_call_analysis.get_document_content_as_str()),
         "ai_queries": json.dumps([msg.tool_calls[0].get("args", {}).get("query", "") for msg in ai_queries]),
         "len_ai_queries": len(ai_queries),
         "search_limit_text": search_limit_text,
@@ -285,14 +289,14 @@ def step2_generate_search_or_done(state: Dict[str, Any],
     if result_search_query is None:
         logger = logging.getLogger(__name__)
         logger.warning("All retry attempts failed for tool call, returning None to continue execution")
-        return None, serializable_tool_info
+        return None, tool_saved_info
     
-    return result_search_query, serializable_tool_info
+    return result_search_query, tool_saved_info
 
 
 def step3_format_final_output(state: Dict[str, Any],
-                             result_tool_call_analysis: List[str],
-                             serializable_tool_info: List[str],
+                             result_tool_call_analysis: DocumentStore,
+                             serializable_tool_info: DocumentStore,
                              llm,
                              config: SearchConfig) -> str:
     """
@@ -300,10 +304,13 @@ def step3_format_final_output(state: Dict[str, Any],
     """
     
     print("no search query to run, formatting final output")
+
+    if not serializable_tool_info:
+        serializable_tool_info = DocumentStore()
     
     # Your exact final context
     final_context = {
-        "tool_saved_info": json.dumps(serializable_tool_info + result_tool_call_analysis)
+        "tool_saved_info": serializable_tool_info.get_document_content_as_str() + result_tool_call_analysis.get_document_content_as_str(),
     }
     
     # Apply configurable state mapping
@@ -311,8 +318,17 @@ def step3_format_final_output(state: Dict[str, Any],
     
     # Your exact prompt formatting and LLM call
     formatted_prompt = config.format_prompt.format(**format_context)
-    final_result = llm.invoke(formatted_prompt)
-    return final_result.content
+
+    output_format_prompt = """
+    All returned insights should have citations to the source documents. Document all have after their content [ref:document_id].
+    Return you output as a list of Facts. Each fact has content write as instructed in the beginning of the prompt, and a document_id field with the source document id.
+    """
+
+    llm_with_format = llm.with_structured_output(SourcedFactsList)
+    result = llm_with_format.invoke(formatted_prompt + output_format_prompt) 
+    merged_documents = serializable_tool_info + result_tool_call_analysis
+    documents = merged_documents.recreate_from_sourced_facts(result)
+    return documents
 
 
 def execute_search_pattern_flexible(state: Dict[str, Any],
@@ -349,50 +365,6 @@ def execute_search_pattern_flexible(state: Dict[str, Any],
         
         return {
             "final_output": final_output,
-            "ai_queries": [AIMessage(content="no more searches")],
-            "last_tool_call_count": 0  # No tool calls made in this step
+            "ai_queries": [AIMessage(content="no more searches")]
         }
 
-
-def create_market_research_config() -> SearchConfig:
-    """Example configuration for market research subgraph"""
-    
-    return SearchConfig(
-        analyze_prompt="""
-        <SYSTEM>You are a market research analyst studying: {market_segment}</SYSTEM>
-        <INSTRUCTIONS>Extract market data, trends, and competitive insights</INSTRUCTIONS>
-        <INPUT>
-        market_segment: {market_segment}
-        research_goals: {research_goals}
-        last_tool_call_output: {last_tool_call_output}
-        </INPUT>
-        """,
-        
-        search_prompt="""
-        <SYSTEM>You are a market researcher.</SYSTEM>
-        <INSTRUCTIONS>Find market data for {market_segment} focused on: {research_goals}</INSTRUCTIONS>
-        <INPUT>
-        market_segment: {market_segment}
-        research_goals: {research_goals}
-        tool_saved_info: {tool_saved_info}
-        ai_queries: {ai_queries}
-        </INPUT>
-        """,
-        
-        format_prompt="""
-        <SYSTEM>You are a market analyst.</SYSTEM>
-        <INSTRUCTIONS>Create market analysis report for: {market_segment}</INSTRUCTIONS>
-        <INPUT>
-        market_segment: {market_segment}
-        research_goals: {research_goals}
-        tool_saved_info: {tool_saved_info}
-        </INPUT>
-        """,
-        
-        state_field_mapping={
-            "market_segment": "market_segment",
-            "research_goals": "research_goals"
-        },
-        
-        component_name=ComponentNames.PRODUCT_RESEARCH  # Use product_research limits for this example
-    )
