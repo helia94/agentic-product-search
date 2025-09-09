@@ -26,6 +26,9 @@ from agent.configuration.search_limits import ComponentNames, SearchLimitsConfig
 from langchain_tavily import TavilySearch
 
 from langchain.globals import set_debug
+from agent.prompts.pattern_search.pattern_analyze_prompt import PATTERN_ANALYZE_PROMPT
+from agent.prompts.pattern_search.pattern_search_prompt import PATTERN_SEARCH_PROMPT
+from agent.prompts.pattern_search.pattern_format_prompt import PATTERN_FORMAT_PROMPT
 set_debug(True)
 
 

@@ -9,7 +9,7 @@ import asyncio
 from typing import Dict, Any
 
 from agent.domain.repositories.job_repository import JobRepository
-from agent.graph.graph_v2 import graph
+from agent.graph.full_graph import graph
 from agent.graph.state_V2 import OverallState
 from agent.tracing.graph_wrapper import create_tracked_executor
 

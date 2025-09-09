@@ -1,7 +1,7 @@
 import json
 
 from agent.graph.state_V2 import OverallState
-from agent.graph.explore_agent_graph import graph_explore
+from agent.graph.explore_graph import graph_explore
 from agent.graph.final_info_graph import final_info_graph
 from agent.tracing.node_progress import track_node_progress
 from langchain_core.runnables import RunnableConfig

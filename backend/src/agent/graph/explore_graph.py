@@ -1,53 +1,27 @@
-import os
-import json
 from typing import List
-from datetime import datetime
-
-
 from dotenv import load_dotenv
 
 load_dotenv()
-from langchain_core.messages import AIMessage
-from langgraph.types import Send
+
 from langgraph.graph import StateGraph
 from langgraph.graph import START, END
-from langchain_core.runnables import RunnableConfig
-from google.genai import Client
-import tiktoken  # Ensure tiktoken is installed in the environment
 
 from agent.graph.state_V2 import ProductSimple, ProductSimpleList
 from agent.configuration.search_limits import SearchLimitsConfig
-from agent.configuration import Configuration
 
-from langchain_google_genai import ChatGoogleGenerativeAI
-from langchain_groq import ChatGroq
-
-from langgraph.types import interrupt, Command
 
 
 from typing import List
-from pydantic import BaseModel, Field
-
-from langgraph.checkpoint.memory import InMemorySaver
-
-from langchain_tavily import TavilySearch
 from typing import Annotated
-
-from typing_extensions import TypedDict
-
 from langgraph.graph import StateGraph, START, END
 from langgraph.graph.message import add_messages
 
-import json
-
-from langchain_core.messages import ToolMessage
 from langchain.globals import set_debug, set_verbose
 from agent.configuration.llm_setup import get_llm
 from agent.utils.tool_orchestrator import DynamicTavilyToolOrchestrator
 from agent.graph.search_pattern import BaseSearchState, execute_search_pattern_flexible, SearchConfig
 from agent.configuration.search_limits import ComponentNames
-from langchain_tavily import TavilySearch
-from agent.graph.research_with_pattern import research_graph_with_pattern
+from agent.graph.deep_seach_graph import research_graph_with_pattern
 from agent.prompts.exploration.explore_analyze_prompt import EXPLORE_ANALYZE_PROMPT
 from agent.prompts.exploration.explore_search_prompt import EXPLORE_SEARCH_PROMPT
 from agent.prompts.exploration.explore_format_prompt import EXPLORE_FORMAT_PROMPT
