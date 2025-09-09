@@ -48,6 +48,9 @@ from agent.graph.search_pattern import BaseSearchState, execute_search_pattern_f
 from agent.configuration.search_limits import ComponentNames
 from langchain_tavily import TavilySearch
 from agent.graph.research_with_pattern import research_graph_with_pattern
+from agent.prompts.exploration.explore_analyze_prompt import EXPLORE_ANALYZE_PROMPT
+from agent.prompts.exploration.explore_search_prompt import EXPLORE_SEARCH_PROMPT
+from agent.prompts.exploration.explore_format_prompt import EXPLORE_FORMAT_PROMPT
 
 #set_debug(True)
 #set_verbose(True)
@@ -85,95 +88,9 @@ def create_product_explore_config() -> SearchConfig:
     """Configuration for product exploration search pattern"""
     
     return SearchConfig(
-        analyze_prompt="""
-        <SYSTEM>
-        You are a product discovery expert who extracts specific product information from search results.
-        You focus on finding concrete, specific product models with clear specifications.
-        </SYSTEM>
-        
-        <INSTRUCTIONS>
-        Analyze the search results and extract specific products mentioned:
-        - ONLY Look for specific product models, not just categories or brands. Wrong example: Smartphone-based sEMG. Correct example: Spren Body Composition Scanner - Pro ios app.  
-        - Extract ALL details found: brand, model name, features, pricing, specifications, user feedback, availability, etc.
-        - Focus on products that match the search query: {query}
-        - Preserve ALL factual information found, including specific numbers, measurements, prices, technical details
-        
-        Return your findings as a comprehensive list preserving ALL specific information about each product found.
-        Include direct quotes, exact figures, and detailed specifications exactly as found in the source.
-        </INSTRUCTIONS>
-        
-        <INPUT>
-        query: {query}
-        queries_remaining: {queries}
-        last_tool_call_arguments: {last_tool_call_arguments}
-        last_tool_call_output: {last_tool_call_output}
-        max_products: {max_explore_products}
-        </INPUT>
-        """,
-        
-        search_prompt="""
-        <SYSTEM>
-        You are a product discovery expert searching for specific products based on user queries.
-        Your goal is to find concrete, purchasable products that match the user's needs.
-        </SYSTEM>
-        
-        <INSTRUCTIONS>
-        Search for products based on the remaining queries:
-        - Process queries one by one: {queries}
-        - Search for specific products, models, and brands
-        {search_limit_text}
-        - Don't repeat previous searches: {ai_queries}
-        - Focus on finding purchasable, specific product models
-        - Stop when you have enough products ({max_explore_products}) or no more queries
-        - You can make UP TO {concurrent_searches} search tool calls in parallel for faster research
-        
-        Use the search tool to find products or return nothing if done.
-        </INSTRUCTIONS>
-        
-        <INPUT>
-        query: {query}
-        queries: {queries}
-        max_explore_products: {max_explore_products}
-        tool_saved_info: {tool_saved_info}
-        ai_queries: {ai_queries}
-        </INPUT>
-        """,
-        
-        format_prompt="""
-        <SYSTEM>
-        You are a product discovery expert who formats found products into a structured list.
-        </SYSTEM>
-        
-        <INSTRUCTIONS>
-        Format all discovered products into a JSON list with this exact structure:
-        - ONLY Look for specific product models, not just categories or brands. Wrong example: Smartphone-based sEMG. Correct example: Spren Body Composition Scanner - Pro ios app.  
-
-        
-        [
-            {{
-                "id": "product-model-name",
-                "name": "Brand Product Model",
-                "USP": "Complete unique selling proposition with all details found",
-                "use_case": "Complete use case description with all contexts mentioned",
-                "other_info": "ALL information found: prices, specifications, battery life, dimensions, user feedback, availability, technical details, ratings, etc. - preserve everything"
-            }}
-        ]
-        
-        Requirements:
-        - Maximum {max_explore_products} products
-        - Only specific, purchasable product models
-        - Deduplicate similar products
-        - Focus on products matching query: {query}
-        </INSTRUCTIONS>
-        
-        <INPUT>
-        query: {query}
-        queries: {queries}
-        max_explore_products: {max_explore_products}
-        tool_saved_info: {tool_saved_info}
-        </INPUT>
-        """,
-        
+        analyze_prompt=EXPLORE_ANALYZE_PROMPT,
+        search_prompt=EXPLORE_SEARCH_PROMPT,
+        format_prompt=EXPLORE_FORMAT_PROMPT,
         state_field_mapping={
             "query": "query",
             "queries": "queries",
