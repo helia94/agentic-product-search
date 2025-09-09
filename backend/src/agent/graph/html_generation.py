@@ -5,7 +5,7 @@ from langchain_core.runnables import RunnableConfig
 
 from agent.graph.state_V2 import OverallState
 from agent.configuration.llm_setup import get_llm
-from agent.graph.html_generation_prompt import HTML_GENERATION_PROMPT
+from agent.prompts.generation.html_input_prompt import HTML_INPUT_PROMPT
 
 from agent.tracing.node_progress import track_node_progress
 
@@ -33,7 +33,7 @@ def generate_html_results(state: OverallState, config: RunnableConfig) -> Overal
             ## Input Data:
             Completed Products: {completed_products}
             """
-        formatted_prompt = HTML_GENERATION_PROMPT + input_prompt.format(
+        formatted_prompt = HTML_INPUT_PROMPT + input_prompt.format(
             completed_products=products_json
         )
         

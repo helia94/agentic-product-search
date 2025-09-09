@@ -1,10 +1,6 @@
-"""
-HTML Generation Prompt for Product Results
+"""HTML generation input prompt"""
 
-This file contains the prompt template for generating HTML output from completed product results.
-"""
-
-HTML_GENERATION_PROMPT = """
+HTML_INPUT_PROMPT = """
 <TITLE>UI Artist — Product-to-HTML Instruction Set (LLM-Optimized)</TITLE>
 
 \<SYSTEM\_ROLE>
