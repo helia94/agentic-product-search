@@ -93,7 +93,7 @@ def test_graph_v2_integration():
     print("🧪 Testing graph_v2 integration...")
     
     try:
-        from agent.graph.graph_v2 import (
+        from agent.graph.full_graph import (
             configure_search_limits_for_product_search,
             configure_aggressive_search_limits,
             configure_thorough_search_limits,
