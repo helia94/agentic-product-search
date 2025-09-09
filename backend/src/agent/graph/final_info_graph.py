@@ -24,6 +24,11 @@ from agent.utils.tool_orchestrator import DynamicTavilyToolOrchestrator
 from agent.graph.search_pattern import BaseSearchState, execute_search_pattern_flexible, SearchConfig
 from agent.configuration.search_limits import ComponentNames, SearchLimitsConfig
 from langchain_tavily import TavilySearch
+from agent.prompts.final_info.final_info_analyze_prompt import FINAL_INFO_ANALYZE_PROMPT
+from agent.prompts.final_info.final_info_search_prompt import FINAL_INFO_SEARCH_PROMPT
+from agent.prompts.final_info.final_info_format_prompt import FINAL_INFO_FORMAT_PROMPT
+from agent.prompts.final_info.final_info_fix_prompt import FINAL_INFO_FIX_PROMPT
+from agent.prompts.final_info.final_info_conversion_prompt import FINAL_INFO_CONVERSION_PROMPT
 
 #set_debug(True)
 #set_verbose(True)
@@ -56,167 +61,9 @@ def create_final_info_config() -> SearchConfig:
     """Configuration for final product information completion"""
     
     return SearchConfig(
-        analyze_prompt="""
-        <SYSTEM>
-        You are a product information completion agent. Analyze the last search result to extract missing ProductFull fields.
-        </SYSTEM>
-
-        <INSTRUCTIONS>
-        Extract ALL product information from the search results:
-        "USP": "Complete unique selling proposition with all details and context found.",
-        "use_case": "ALL contexts and user segments mentioned with complete details.",
-        "country": "Complete design and manufacturing information found.",
-        "year": "Release year with any additional timeline information found.",
-        "review_summary": "ALL user review details found - preserve complete feedback, specific issues, positive points, context.",
-        "rating": "ALL rating information found from all sources with complete context.",
-        "reviews_count": "ALL review count information from all sources.",
-        "image_url": "ALL image URLs found, preserve all sources.",
-        "product_url": "ALL retailer links and purchasing information found."
-        ANY other information found - preserve everything.
-
-        Preserve ALL factual data found, maintain complete context and details.
-        Return comprehensive insights preserving ALL information as complete detailed strings.
-        </INSTRUCTIONS>
-
-        <INPUT>
-        product: {product}
-        last_tool_call_arguments: {last_tool_call_arguments}
-        last_tool_call_output: {last_tool_call_output}
-        </INPUT>
-        """,
-        
-        search_prompt="""
-        <SYSTEM_PROMPT>
-        You are a product research agent.
-
-        <TASK>
-        For the given product, FILL all remaining fields. 
-        Use the SEARCH TOOL if any field is missing.
-        Return either:
-        - a search tool call (with precise query string), OR
-        - nothing if you have enough information.
-        we need these fields in order of importance:
-        "product_url": "Retailer link for the specified country; note if unavailable."
-        "image_url": "1–3 image URLs, prefer official/reputable.",
-        "review_summary": "Keyword-style user review highlights; no fluff.",
-        "rating": "Score plus source (e.g., '4.5/5 on Amazon').",
-        "reviews_count": "Exact review count; no ranges.",
-        "USP": "One-sentence unique selling proposition.",
-        "use_case": "Primary context or user segment.",
-        "country": "Design and manufacturing origin (e.g., 'Designed in FI, made in CN').",
-        "year": "Release year (YYYY).",
-        </TASK>
-
-        <CONSTRAINTS>
-        {search_limit_text}
-        - Preserve ALL details found. Use comprehensive, information-dense language.
-        - You can make UP TO {concurrent_searches} search tool calls in parallel for faster research
-        - Review summaries = preserve COMPLETE user feedback, specific experiences, detailed issues and benefits mentioned.
-        - Image URLs: find ALL available URLs from official and reputable sources.
-        - Product URL must include ALL purchasing options found with complete details.
-        - Stop and return empty if product model is unclear.
-        - DO NOT search for information you already have in tool_saved_info or in product info input. check all we have first before writing queries.
-        - DO NOT repeat queries in ai_queries.
-        - New search query should be significantly different from previous ones.
-        - Use function calling for the search
-        - DO NOT use include_domains
-        - DO NOT BUNDLE unrelated key words in search like "manufacture country, user ratings, review count, review summaries, official product images
-        - Either search for each missing field individually, or use general query like honest reviews of X
-        - image_url is very important always include it
-        - You can make UP TO {concurrent_searches} search tool calls in parallel for faster research
-        </CONSTRAINTS>
-
-        <INPUT FORMAT>
-        Product:
-        - name: str
-        - criteria: Dict[str, str]
-        - USP: str
-        - use_case: str
-
-        <OUTPUT FORMAT>
-        Return one of:
-        1. `search("your_query_here")`
-        2. Nothing if you have sufficient information
-
-        <EXAMPLES>
-
-        # ✅ EXAMPLE 1 - First Search
-        search("Withings Sleep Analyzer specifications")
-
-        # ✅ EXAMPLE 2 - First Search
-        search("Oura Ring Gen3 expert reviews and details")
-        </EXAMPLES>
-        </SYSTEM_PROMPT>
-
-        <INPUT>
-        product: {product}
-        tool_saved_info: {tool_saved_info}
-        ai_queries: {ai_queries}
-        </INPUT>
-        """,
-        
-        format_prompt="""
-        <SYSTEM>
-        You are a product information completion agent.
-        </SYSTEM>
-
-        <INSTRUCTIONS>
-        Create a fully completed product information json using ALL gathered information.
-        YOU HAVE TO RETURN A VALID JSON.
-        Put ALL the gathered information into the appropriate fields - preserve everything found.
-        Include ALL factual details found - this comprehensive information helps buyers make informed decisions.
-        This is for the buyer - provide complete, detailed information.
-
-        FILL all remaining json fields with COMPLETE information:
-        "id": "Internal unique ID for tracking/retrieval. Inside product info.",
-        "name": "Complete product name with ALL specs/details found. Inside product info.",
-        "criteria": "Dict of {{criterion: COMPLETE detailed value/notes with ALL information found}}. Inside product info under evaluation.",
-        "USP": "COMPLETE unique advantage description with ALL details. Inside product info or tool_saved_info.",
-        "use_case": "ALL intended users/usages mentioned with complete context. Inside product info or tool_saved_info.",
-        "price": "ALL pricing information found (include ranges, different sources). Inside product info.",
-        "country": "COMPLETE design and manufacture information. Inside tool_saved_info.",
-        "year": "Release year with ANY additional timeline details. Inside tool_saved_info.",
-        "review_summary": "COMPLETE user review details - preserve ALL feedback, issues, benefits, context. Inside tool_saved_info or product.",
-        "rating": "ALL ratings from ALL sources with complete context. Inside tool_saved_info.",
-        "reviews_count": "ALL review counts from ALL sources. Inside tool_saved_info.",
-        "image_url": "ALL image URLs found from ALL sources. Inside tool_saved_info.",
-        "product_url": "ALL retailer URLs and purchasing information found. Inside tool_saved_info."
-        
-        If any field cannot be determined from the research, use "unknown".
-        Return valid JSON format for ProductFull with COMPLETE information preservation.
-        </INSTRUCTIONS>
-        <EXAMPLES>
-        
-        # ✅ EXAMPLE OUTPUT
-        {{
-            "id": "withings_sleep_analyzer_2020",
-            "name": "Withings Sleep Analyzer – Advanced Sleep Tracking Pad",
-            "criteria": {{
-                "price": "$129",
-                "accuracy_of_total_sleep_time": "Acceptable (within ~20 min bias vs PSG in clinical studies)",
-                "accuracy_of_sleep_stages": "Fair (good for light/deep, but struggles with REM detection)"
-            }},
-            "USP": "non-wearable apnea tracking",
-            "use_case": "at-home sleep diagnostics",
-            "price": 129.0,
-            "country": "Designed in France, produced in China",
-            "year": 2020,
-            "review_summary": "non-intrusive, accurate apnea detection, app sync issues",
-            "rating": "4.2/5 on Amazon",
-            "reviews_count": "1563",
-            "image_url": [
-                "https://www.withings.com/us/en/sleep-analyzer/img1.jpg"
-            ],
-            "product_url": "https://www.withings.com/fr/en/sleep-analyzer"
-        }}
-        </EXAMPLES>
-
-        <INPUT>
-        product: {product}
-        tool_saved_info: {tool_saved_info}
-        </INPUT>
-        """,
-        
+        analyze_prompt=FINAL_INFO_ANALYZE_PROMPT,
+        search_prompt=FINAL_INFO_SEARCH_PROMPT,
+        format_prompt=FINAL_INFO_FORMAT_PROMPT,
         state_field_mapping={
             "product": "product"
         },
@@ -263,15 +110,8 @@ def validate_and_fix_json(state: FinalInfoState):
         return {"product_output_string": final_output}
     except json.JSONDecodeError:
         # If invalid JSON, use LLM to fix it
-        fix_prompt = """
-        The following text should be valid JSON but it's malformed. 
-        Fix it to be valid JSON without changing the content meaning.
-        Return only the fixed JSON, no explanations or markdown.
-        
-        Text to fix:
-        {final_output}
-        """
-        
+        fix_prompt = FINAL_INFO_FIX_PROMPT
+
         try:
             formatted_prompt = fix_prompt.format(final_output=final_output)
             fixed_json = get_llm("json_fixing").invoke(formatted_prompt).content
@@ -295,15 +135,9 @@ def convert_to_product_full(state: FinalInfoState):
         return {"product_output_formatted": None}
     
     llm_structured = get_llm("final_product_info").with_structured_output(ProductFull)
-    
-    conversion_prompt = """
-    Convert this product information into a properly structured ProductFull object.
-    Ensure all fields are correctly typed and formatted.
-    
-    Product information to convert:
-    {final_output}
-    """
-    
+
+    conversion_prompt = FINAL_INFO_CONVERSION_PROMPT
+
     try:
         formatted_prompt = conversion_prompt.format(final_output=final_output)
         product_full = llm_structured.invoke(formatted_prompt)
