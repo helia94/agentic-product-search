@@ -1,11 +1,12 @@
-from typing import List
 from langchain_core.runnables import RunnableConfig
-from langgraph.types import interrupt
-
 from agent.graph.state_V2 import OverallState, QueryBreakDown, QueryTips, Criteria
 from agent.configuration import Configuration
 from agent.configuration.llm_setup import get_llm
 from agent.tracing.node_progress import track_node_progress
+from agent.prompts.query_processing.query_parser_instructions import QUERY_PARSER_PROMPT
+from agent.prompts.query_processing.query_enrichment_instructions import QUERY_ENRICHMENT_PROMPT
+from agent.prompts.query_processing.use_case_selection_instruction import USE_CASE_SELECTION_PROMPT
+from agent.prompts.query_processing.criteria_instructions import CRITERIA_PROMPT
 
 
 @track_node_progress("pars_query")
@@ -14,17 +15,7 @@ def pars_query(state: OverallState, config: RunnableConfig) -> OverallState:
 
     structured_llm = get_llm("query_breakdown").with_structured_output(QueryBreakDown)
     user_query = state.get("user_query") 
-    query_parser_instructions = """
-    I want to buy: {user_query} 
-    Agent are gonna search step by step for it. 
-    For that break down the query to these parts. 
-    The Product, Use case, Conditions, and finally other is any other specification or tips, but only informative info not blant stuff like find best .
-    Example: "Dummbles for strength training at home under 100 euros"
-    The Product: "Dummbles"
-    Use case: "strength training at home"
-    Conditions: ["under 100 euros"]
-    other: ""
-    """
+    query_parser_instructions = QUERY_PARSER_PROMPT
     formatted_prompt = query_parser_instructions.format(
         user_query=user_query
     )
@@ -46,34 +37,7 @@ def enrich_query(state: OverallState, config: RunnableConfig) -> OverallState:
 
     structured_llm = get_llm("query_tips").with_structured_output(QueryTips)
     user_query = state.get("user_query") 
-    query_parser_instructions = """
-        I want to buy something. Agent are gonna search step by step for it.
-        For that reason about this extra information.
-
-        Relevant search time: If very high tech, fast evolving field or AI based then last year is relevant, for stable stuff like dumbbells, leave empty "".
-
-        Sources hint: Where do nerdy users of this product hang out? Reddit for apps, country-specific price comparison platforms like Geizhals, Hacker News for niche tech, Amazon for simple retail, and the best local source you can think of.
-
-        How many products to show: When product is undifferentiated and depend highly on taste show 10, like shoes. If product is niche and really differentiated show 3, like e-reading device.
-
-        Use cases and customer segments list: One product category serves many customer segments and many use cases, if not completely clear by user query list possible segments max 4 so the user can choose.
-
-        offer usecases only if you think is really unclear and customer segments need different options. Do not be unreasonable/annoying in your suggestions. only if it helps the search significantly. 
-
-        Example query "best noise cancelling device"
-        Relevant search time: 2 years
-        Sources hint: reddit, wired, youtube,
-        how many products to show: 4
-        use cases and customer segments list: [Travelers, Office worker, Sleep aid, Factory Workers]
-
-        Example query "Dumbbells for strength training at home under 100 euros up to 4 kilo"
-        Relevant search time: None
-        sources hint: amazon
-        how many products to show: 6
-        use cases and customer segments list: None
-
-        what i want to buy is: {user_query}
-    """
+    query_parser_instructions = QUERY_ENRICHMENT_PROMPT,
     formatted_prompt = query_parser_instructions.format(
         user_query=user_query
     )
@@ -102,9 +66,7 @@ def human_ask_for_use_case(state: OverallState, config: RunnableConfig) -> dict:
         answer = state.get("human_answer")
         question = state.get("human_question", "")
         
-        instruction = """ given the question and the answer, return the selected use case. Just the use case, no other text.
-        Question: {question}
-        Answer: {answer}"""
+        instruction = USE_CASE_SELECTION_PROMPT
         formatted_prompt = instruction.format(
             question=question,
             answer=answer
@@ -147,43 +109,7 @@ def find_criteria(state: OverallState, config: RunnableConfig) -> OverallState:
     use_case = state.get("query_breakdown", {}).get("use_case", "")
     conditions = state.get("query_breakdown", {}).get("conditions", "")
 
-    instructions = """
-        Give me the main criteria that matter the most when buying {product} for {use_case}, sort them by impact and how differentiated the top products are on it. 
-        My extra conditions are {conditions}. 
-        Max 5 criteria. But only very critical ones, do not just make a list. 
-        this is not school. you will be rewarded by critical  thinking and quality of judgement, not number of words, what would a no bullshit expert say to his friend as advice.
-        intentionally decide how specific or general the criteria should be.
-
-        Task: I want to buy headphones for daily remote work calls in shared spaces, and I have these conditions: must be wireless, work with Mac, not over-ear
-        Output:
-        "buying_criteria": ["mic clarity in noisy environments", "latency with MacOS apps", "fit comfort for 4h+ wear", "stable Bluetooth connection", "battery life with mic use"]
-
-
-        Task: I want to buy smart ring for stress tracking, and I have these conditions: must be comfortable to wear at night and discreet
-        Output:
-        "buying_criteria": ["HRV tracking accuracy", "real-time stress alerts", "sleep data quality", "ring size comfort", "battery life in continuous mode"]
-
-        4.
-        Task: I want to buy app-based budgeting tool for freelancer income tracking, and I have these conditions: needs EU bank integration and VAT tagging
-        Output:
-        "buying_criteria": ["multi-bank syncing reliability", "income/expense tagging flexibility", "VAT & invoice support", "report exports for tax filing", "mobile UX for quick edits"]
-
-        5.
-        Task: I want to buy robot vacuum for pet hair removal, and I have these conditions: must avoid poop, work with dark floors, auto-empty optional
-        Output:
-        "buying_criteria": ["hair pickup efficiency on hard floors", "object recognition and poop-avoidance", "suction vs noise tradeoff", "carpet edge transitions", "maintenance hassle"]
-
-        6.
-        Task: I want to buy note-taking app for daily idea capture and link-based research, and I have these conditions: must work offline, exportable to markdown
-        Output:
-        "buying_criteria": ["speed of quick capture", "linking and backlink UX", "offline stability", "search relevance", "export structure quality"]
-
-       
-        the current task is for:
-        I want to buy {product} for {use_case}, and I have these conditions: {conditions}.
-
-        now give list of "buying_criteria": 
-    """
+    instructions = CRITERIA_PROMPT
     formatted_prompt = instructions.format(
         product=product,
         use_case=use_case,
