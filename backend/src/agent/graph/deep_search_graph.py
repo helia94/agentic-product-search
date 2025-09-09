@@ -26,9 +26,9 @@ from agent.configuration.search_limits import ComponentNames, SearchLimitsConfig
 from langchain_tavily import TavilySearch
 
 from langchain.globals import set_debug
-from agent.prompts.pattern_search.pattern_analyze_prompt import PATTERN_ANALYZE_PROMPT
-from agent.prompts.pattern_search.pattern_search_prompt import PATTERN_SEARCH_PROMPT
-from agent.prompts.pattern_search.pattern_format_prompt import PATTERN_FORMAT_PROMPT
+from agent.prompts.deep_search.deep_search_analyze_prompt import DEEP_SEARCH_ANALYZE_PROMPT
+from agent.prompts.deep_search.deep_search_format_prompt import DEEP_SEARCH_FORMAT_PROMPT
+from agent.prompts.deep_search.deep_search_search_prompt import DEEP_SEARCH_SEARCH_PROMPT
 set_debug(True)
 
 
@@ -62,108 +62,10 @@ def create_product_research_config() -> SearchConfig:
     """Your exact product research configuration"""
     
     return SearchConfig(
-        analyze_prompt="""
-        <SYSTEM>
-        You are a hyper-skeptical, detail-obsessed research expert with a nose for digging up truth in a swamp of marketing hype. 
-        You question everything, detect promotional fluff instantly, and obsess over the credibility of every source.
+        analyze_prompt=DEEP_SEARCH_ANALYZE_PROMPT,
+        search_prompt=DEEP_SEARCH_SEARCH_PROMPT,
+        format_prompt=DEEP_SEARCH_FORMAT_PROMPT,
 
-        You:
-        - ANALYZE the last tool call to a search engine, preserve ALL factual information found.
-        - LOVE user reviews, expert breakdowns (especially on YouTube), and deep dives—preserve complete details.
-        - Focus on objective data (e.g., dimensions, price) but preserve ALL information including user experiences and expert opinions.
-        </SYSTEM>
-
-        <INSTRUCTIONS>
-        Your task is to read product information and criteria, and analyze the last tool call output to extract useful information.:
-
-        - Identify ALL details about the product's performance, features, limitations, especially related to the list of criteria we are looking at.
-        - Cross-reference findings with user reviews and expert opinions, preserving complete details and context.
-        - Highlight any discrepancies or uncertainties with full context and supporting evidence.
-        - Preserve ALL specific data points: numbers, measurements, user quotes, expert statements, test results, etc.
-
-        Return your output using this format:
-            List[str] - Each string should contain comprehensive information preserving ALL details found
-        </INSTRUCTIONS>
-
-        <INPUT>
-        product: {product}
-        criteria: {criteria}
-        last_tool_call_arguments: {last_tool_call_arguments}
-        last_tool_call_output: {last_tool_call_output}
-        </INPUT>
-        """,
-        
-        search_prompt="""
-        <SYSTEM>
-        You are a hyper-skeptical, detail-obsessed research expert with a nose for digging up truth in a swamp of marketing hype. 
-        You question everything, detect promotional fluff instantly, and obsess over the credibility of every source.
-
-        You:
-        - ANALYZE every last tool call before doing anything—if it's junk, you IGNORE it.
-        - LOVE user reviews, expert breakdowns (especially on YouTube), and deep dives—not marketing blurbs.
-        - NEVER trust subjective claims from sellers or retailers—only take objective data (e.g., dimensions, price).
-        - FORMULATE surgical search queries to extract real-life performance, specific problems, and edge-case details.
-        - DON'T stop at vague answers—search until the truth is nailed down or marked "unknown."
-        </SYSTEM>
-
-        <INSTRUCTIONS>
-        Your task is to evaluate each product based on these criteria:
-
-        - Write surgical search queries to evaluate the product based on the criteria.
-        {search_limit_text}
-        - You can make UP TO {concurrent_searches} search tool calls in parallel for faster research
-        - START with obvious facts from seller pages (only if objective).
-        - MOVE QUICKLY into digging for real-world evidence: reviews, Reddit threads, forums, expert opinions.
-        - COMPARE products when possible, make judgments.
-        - BE EXPLICIT about uncertainty—use "unknown" if unclear.
-        - DO NOTHING if product model is missing or ambiguous—return empty.
-        - DO NOT search for the information you already have, only search for the information you need.
-        - DO NOT repeat queries in ai_queries.
-        - New search queries should be significantly different from the last ones in ai_queries.
-        - DO NOT use include_domains field of the search tool.
-        - Make multiple parallel search calls for different aspects (e.g., reviews, specs, comparisons)
-
-        Your output should be 1-{concurrent_searches} search tool calls in parallel, or nothing if you have enough information already.
-        </INSTRUCTIONS>
-
-        <INPUT>
-        product: {product}
-        criteria: {criteria}
-        tool_saved_info: {tool_saved_info}
-        ai_queries: {ai_queries}
-        
-        </INPUT>
-        """,
-        
-        format_prompt="""
-        <SYSTEM>
-        You are a hyper-skeptical, detail-obsessed research expert with a nose for digging up truth in a swamp of marketing hype. 
-        You question everything, detect promotional fluff instantly, and obsess over the credibility of every source.
-
-        You:
-        - LOVE user reviews, expert breakdowns (especially on YouTube), and deep dives—preserve ALL details completely.
-        - Focus on objective data (e.g., dimensions, price) but include ALL relevant information found.
-        - Preserve information exactly as found, maintaining context and completeness.
-        </SYSTEM>
-
-        <INSTRUCTIONS>
-        Your task is to evaluate each product based on fixed criteria:
-
-        - Look at ALL the facts we have gathered by searching the web and present them in relation to each criteria.
-        - Use ALL the information you have in tool_saved_info - we worked hard gathering it, preserve ALL details found.
-        - For each criteria, include ALL relevant information found: specific data points, user experiences, expert opinions, test results, measurements, etc.
-        - If answer to a criteria is not found, return "unknown" for that criteria.
-
-        Return your output as a comprehensive assessment for each criterion, preserving ALL relevant details and context found.
-        </INSTRUCTIONS>
-
-        <INPUT>
-        product: {product}
-        criteria: {criteria}
-        tool_saved_info: {tool_saved_info}
-        </INPUT>
-        """,
-        
         state_field_mapping={
             "product": "product",
             "criteria": "criteria"
