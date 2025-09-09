@@ -21,7 +21,7 @@ from agent.configuration.llm_setup import get_llm
 from agent.utils.tool_orchestrator import DynamicTavilyToolOrchestrator
 from agent.graph.search_pattern import BaseSearchState, execute_search_pattern_flexible, SearchConfig
 from agent.configuration.search_limits import ComponentNames
-from agent.graph.deep_seach_graph import research_graph_with_pattern
+from agent.graph.deep_search_graph import research_graph_with_pattern
 from agent.prompts.exploration.explore_analyze_prompt import EXPLORE_ANALYZE_PROMPT
 from agent.prompts.exploration.explore_search_prompt import EXPLORE_SEARCH_PROMPT
 from agent.prompts.exploration.explore_format_prompt import EXPLORE_FORMAT_PROMPT
