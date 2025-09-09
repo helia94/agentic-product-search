@@ -37,7 +37,7 @@ def enrich_query(state: OverallState, config: RunnableConfig) -> OverallState:
 
     structured_llm = get_llm("query_tips").with_structured_output(QueryTips)
     user_query = state.get("user_query") 
-    query_parser_instructions = QUERY_ENRICHMENT_PROMPT,
+    query_parser_instructions = QUERY_ENRICHMENT_PROMPT
     formatted_prompt = query_parser_instructions.format(
         user_query=user_query
     )
