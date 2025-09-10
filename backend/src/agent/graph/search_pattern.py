@@ -1,292 +1,323 @@
 """
-Flexible Search Pattern - Configurable State Fields
-
-This makes the state field mapping completely configurable so each subgraph
-can specify which state fields map to which prompt template variables.
+Refactored: Flexible Search Pattern (drop‑in outputs, typed internals)
+- Keeps EXACT output keys: "ai_queries", "tool_saved_info", "last_tool_call_count" OR
+  "final_output", "ai_queries".
+- Uses CONSTs for state keys.
+- Splits LLM logic into dedicated private methods.
+- Adds typed internal result classes.
+- Clear scenario paths without IF-maze.
 """
 
-from typing import List, Dict, Any, Optional
-from typing_extensions import TypedDict
-from langchain_core.messages import AIMessage
-from langgraph.graph.message import add_messages
-from typing import Annotated
+from __future__ import annotations
+
+from dataclasses import dataclass
+from typing import Any, Dict, List, Optional, Tuple, TypedDict, Annotated
 import json
-import time
 import logging
 from pydantic import BaseModel, Field
+
+from typing_extensions import Literal
+from langchain_core.messages import AIMessage
+from langgraph.graph.message import add_messages
+
 from agent.configuration.search_limits import ComponentNames
-from agent.citation.document import Document, DocumentStore, SourcedFact, SourcedFactsList, reduce_documents
+from agent.citation.document import (
+    DocumentStore,
+    SourcedFactsList,
+)
 from agent.graph.retry_utils import retry_llm_tool_call
 
 
-# Base state that all search subgraphs will extend
+# ====== Constants for state/return keys ======
+class StateKeys:
+    AI_QUERIES = "ai_queries"
+    TOOL_SAVED_INFO = "tool_saved_info"
+    TOOL_LAST_OUTPUT = "tool_last_output"
+    FINAL_OUTPUT = "final_output"
+    LAST_TOOL_CALL_COUNT = "last_tool_call_count"
+    SEARCH_LIMITS = "search_limits"
+
+
+# ====== External config/typed state ======
 class BaseSearchState(TypedDict):
-    """Base state for all search patterns - your exact structure"""
     ai_queries: Annotated[List[AIMessage], add_messages]
-    tool_saved_info: Annotated[DocumentStore, reduce_documents]
+    tool_saved_info: DocumentStore
     tool_last_output: List[AIMessage]
     final_output: DocumentStore
-    last_tool_call_count: int  # Track how many tool calls were made in the last step
+    last_tool_call_count: int
+    search_limits: Any  
 
 
 class SearchConfig(BaseModel):
-    """Configuration for the search pattern"""
     analyze_prompt: str = Field(description="Step 1: Analyze last tool call")
     search_prompt: str = Field(description="Step 2: Generate new search or done")
     format_prompt: str = Field(description="Step 3: Format final output")
-    state_field_mapping: Dict[str, str] = Field(description="Map template variables to state fields")
-    component_name: str = Field(description="Component name for search limits (e.g. 'product_research')")
-    
+    state_field_mapping: Dict[str, str] = Field(description="Map template vars to state fields")
+    component_name: str = Field(description="Component name for search limits")
+
     def get_max_searches(self, search_limits) -> int:
-        """Get max searches from search_limits configuration"""
         component_limits = {
             "product_exploration": search_limits.product_exploration_max_searches,
-            "product_research": search_limits.product_research_max_searches, 
+            "product_research": search_limits.product_research_max_searches,
             "final_product_info": search_limits.final_product_info_max_searches,
         }
         return component_limits.get(self.component_name, 3)
 
 
-def apply_state_mapping(state: Dict[str, Any], 
-                       state_field_mapping: Dict[str, str],
-                       additional_context: Dict[str, Any] = None) -> Dict[str, str]:
-    """
-    Apply configurable state field mapping to create prompt context.
-    
-    Args:
-        state: The graph state
-        state_field_mapping: {"template_var": "state_field"} mapping
-        additional_context: Extra context variables
-    
-    Returns:
-        Dictionary ready for prompt formatting
-    """
-    
-    format_context = {}
-    
-    # Apply the configurable mapping
-    for template_key, state_key in state_field_mapping.items():
-        value = state.get(state_key, "")
-        
-        # Handle list fields (like criteria) - join with comma
-        if isinstance(value, list):
-            format_context[template_key] = " ,".join(str(v) for v in value)
-        else:
-            format_context[template_key] = str(value)
-    
-    # Add any additional context
-    if additional_context:
-        format_context.update(additional_context)
-    
-    return format_context
+# ====== Internal typed results (not exposed to graph) ======
+@dataclass(frozen=True)
+class RequestMoreSearches:
+    ai_query: AIMessage
+    last_tool_call_count: int
+    tool_saved_info: DocumentStore
 
 
+@dataclass(frozen=True)
+class FinishWithDocuments:
+    final_output: DocumentStore
 
 
-def step1_analyze_last_tool_call(state: Dict[str, Any], 
-                                llm,
-                                config: SearchConfig) -> List[str]:
-    """
-    Step 1: Look at last tool calls - handles multiple parallel tool call outputs using actual count
-    """
-    
-    tool_last_output_list = state.get("tool_last_output", [])
-    ai_queries = state.get("ai_queries", [])
-    last_tool_call_count = state.get("last_tool_call_count", 1)  # Default to 1 if not set
-    
-    if not tool_last_output_list:
-        print("no last tool call outputs, skipping analysis")
-        return DocumentStore()
-        
-    # Get the exact number of tool call outputs from the last step
-    recent_outputs = tool_last_output_list[-last_tool_call_count:] if len(tool_last_output_list) >= last_tool_call_count else tool_last_output_list
-    
-    print(f"analyzing {len(recent_outputs)} recent tool call outputs from last step")
-    
-    # Build context from multiple tool call results
-    tool_arguments = []
-    tool_outputs = []
-    
-    # Get the most recent AI query(s) that generated these tool calls
-    if ai_queries:
-        recent_ai_query = ai_queries[-1]
-        if hasattr(recent_ai_query, 'tool_calls') and recent_ai_query.tool_calls:
-            # Handle the actual number of tool calls that were made (not assume concurrent_count)
-            actual_tool_calls = recent_ai_query.tool_calls[:last_tool_call_count]
-            for i, tool_call in enumerate(actual_tool_calls):
-                query = tool_call.get("args", {}).get("query", "")
-                tool_arguments.append(f"Search {i+1}: {query}")
-        else:
-            tool_arguments.append("No tool call arguments found")
-    
-    # Process multiple outputs
-    print(f"Recent tool call outputs: {[r.content for r in recent_outputs]}")
-    print(f"Recent tool call outputs (parsed): {[json.loads(r.content) for r in recent_outputs]}")
+class FlexibleSearchRunner:
+    """Encapsulates 3-step flow with typed internals and drop-in outputs."""
 
-    documents = [DocumentStore.add_documents_from_tavily(json.loads(r.content)) for r in recent_outputs]
-    documents = DocumentStore.merge(documents)
+    def __init__(self, llm, llm_with_tools, config: SearchConfig):
+        self.llm = llm
+        self.llm_with_tools = llm_with_tools
+        self.config = config
+        self._log = logging.getLogger(__name__)
 
-    print(f"Created DocumentStore {documents} ")
-    print(f"Document contents: {documents.get_document_content_as_str()}")
+    def run(self, state: Dict[str, Any]) -> Dict[str, Any]:
+        analysis_docs = self._analyze_past_search_result_from_tool(state)
 
-    # Your exact tool call context but for multiple calls
-    tool_context = {
-        "last_tool_call_arguments": json.dumps(tool_arguments),
-        "last_tool_call_output": documents.get_document_content_as_str(),
-    }
-    
-    # Apply configurable state mapping
-    format_context = apply_state_mapping(state, config.state_field_mapping, tool_context)
-    
-    # Your exact prompt formatting and LLM call
-    formatted_prompt = config.analyze_prompt.format(**format_context)
+        decision = self._create_search_tool_calls_if_needed(state, analysis_docs)
 
-    output_format_prompt = """
-    All returned insights should have citations to the source documents. Document all have after their content [ref:document_id].
-    Return you output as a list of Facts. Each fact has content write as instructed in the beginning of the prompt, and a document_id field with the source document id.
-    """
+        if isinstance(decision, RequestMoreSearches):
+            # Scenario A: No previous tool call → tool call → finish
+            # Scenario B: Previous tool call → more tool call → finish
+            return {
+                StateKeys.AI_QUERIES: [decision.ai_query],
+                StateKeys.TOOL_SAVED_INFO: analysis_docs,
+                StateKeys.LAST_TOOL_CALL_COUNT: decision.last_tool_call_count,
+            }
 
-    llm_with_format = llm.with_structured_output(SourcedFactsList)
-    result = llm_with_format.invoke(formatted_prompt + output_format_prompt) 
-    documents = documents.recreate_from_sourced_facts(result)
-    return documents
-
-def step2_generate_search_or_done(state: Dict[str, Any],
-                                 result_tool_call_analysis: DocumentStore,
-                                 llm_with_tools,
-                                 config: SearchConfig):
-    """
-    Step 2: Send new query or done - your exact logic with configurable state mapping
-    """
-    
-    tool_saved_info = state.get("tool_saved_info", DocumentStore())
-    if not tool_saved_info:
-        tool_saved_info = DocumentStore()
-    ai_queries = state.get("ai_queries", [])
-    
-    
-    # Get search_limits from state
-    search_limits = state.get("search_limits")
-    if not search_limits:
-        print(f"Warning: No search_limits found in state for {config.component_name}")
-        return None, tool_saved_info
-    
-    # Check max searches limit using search_limits from state
-    max_limit = config.get_max_searches(search_limits)
-    if len(ai_queries) >= max_limit:
-        print(f"Skipping search query generation, reached maximum number of queries ({max_limit}) for {config.component_name}")
-        return None, tool_saved_info
-    
-    # Get concurrent search configuration from search_limits
-    concurrent_configs = {
-        ComponentNames.PRODUCT_EXPLORATION: search_limits.product_exploration_concurrent_searches,
-        ComponentNames.PRODUCT_RESEARCH: search_limits.product_research_concurrent_searches,
-        ComponentNames.FINAL_PRODUCT_INFO: search_limits.final_product_info_concurrent_searches,
-    }
-    concurrent_count = concurrent_configs.get(config.component_name, 3)  # Default fallback
-    
-    # Generate search limit text dynamically
-    if len(ai_queries) > 0:
-        search_limit_text = f"- Max {max_limit} searches for this task. You already used {len(ai_queries)} searches."
-    else:
-        search_limit_text = f"- Use a MAX of {max_limit} searches for this task, ideally fewer."
-    
-    # Your exact search context with dynamic search limit text and concurrent search info
-    search_context = {
-        "tool_saved_info": json.dumps(tool_saved_info.get_document_content_as_str() + result_tool_call_analysis.get_document_content_as_str()),
-        "ai_queries": json.dumps([msg.tool_calls[0].get("args", {}).get("query", "") for msg in ai_queries]),
-        "len_ai_queries": len(ai_queries),
-        "search_limit_text": search_limit_text,
-        "concurrent_searches": concurrent_count,
-    }
-    
-    # Apply configurable state mapping
-    format_context = apply_state_mapping(state, config.state_field_mapping, search_context)
-    
-    # Your exact prompt formatting and LLM call with retry logic
-    formatted_prompt = config.search_prompt.format(**format_context)
-    result_search_query = retry_llm_tool_call(llm_with_tools, formatted_prompt)
-    
-    # Handle case where all retries failed
-    if result_search_query is None:
-        logger = logging.getLogger(__name__)
-        logger.warning("All retry attempts failed for tool call, returning None to continue execution")
-        return None, tool_saved_info
-    
-    return result_search_query, tool_saved_info
-
-
-def step3_format_final_output(state: Dict[str, Any],
-                             result_tool_call_analysis: DocumentStore,
-                             serializable_tool_info: DocumentStore,
-                             llm,
-                             config: SearchConfig) -> str:
-    """
-    Step 3: Write final format - your exact logic with configurable state mapping
-    """
-    
-    print("no search query to run, formatting final output")
-
-    if not serializable_tool_info:
-        serializable_tool_info = DocumentStore()
-    
-    # Your exact final context
-    final_context = {
-        "tool_saved_info": serializable_tool_info.get_document_content_as_str() + result_tool_call_analysis.get_document_content_as_str(),
-    }
-    
-    # Apply configurable state mapping
-    format_context = apply_state_mapping(state, config.state_field_mapping, final_context)
-    
-    # Your exact prompt formatting and LLM call
-    formatted_prompt = config.format_prompt.format(**format_context)
-
-    output_format_prompt = """
-    All returned insights should have citations to the source documents. Document all have after their content [ref:document_id].
-    Return you output as a list of Facts. Each fact has content write as instructed in the beginning of the prompt, and a document_id field with the source document id.
-    """
-
-    llm_with_format = llm.with_structured_output(SourcedFactsList)
-    result = llm_with_format.invoke(formatted_prompt + output_format_prompt) 
-    merged_documents = serializable_tool_info + result_tool_call_analysis
-    documents = merged_documents.recreate_from_sourced_facts(result)
-    return documents
-
-
-def execute_search_pattern_flexible(state: Dict[str, Any],
-                                   llm,
-                                   llm_with_tools,
-                                   config: SearchConfig) -> Dict[str, Any]:
-    """
-    Execute the complete 3-step search pattern with configurable state mapping.
-    
-    This is your exact chatbot_research logic made generic and flexible.
-    """
-    
-    # Step 1: Analyze last tool call
-    result_tool_call_analysis = step1_analyze_last_tool_call(state, llm, config)
-    
-    # Step 2: Generate search query or decide to finish
-    result_search_query, serializable_tool_info = step2_generate_search_or_done(
-        state, result_tool_call_analysis, llm_with_tools, config
-    )
-    
-    # Step 3: Return search action or final output
-    if result_search_query and result_search_query.tool_calls:
-        actual_tool_call_count = len(result_search_query.tool_calls)
-        print(f"we have {actual_tool_call_count} search queries to run in parallel")
+        # Scenario C: Previous tool call → no more tool call → format → finish
+        assert isinstance(decision, FinishWithDocuments)
         return {
-            "ai_queries": [result_search_query],
-            "tool_saved_info": result_tool_call_analysis,
-            "last_tool_call_count": actual_tool_call_count
+            StateKeys.FINAL_OUTPUT: decision.final_output,
+            StateKeys.AI_QUERIES: [AIMessage(content="no more searches")],
         }
-    else:
-        final_output = step3_format_final_output(
-            state, result_tool_call_analysis, serializable_tool_info, llm, config
+
+    # ---- LLM steps (private) ----
+    def _analyze_past_search_result_from_tool(self, state: Dict[str, Any]) -> DocumentStore:
+        """Analyze last tool call outputs → DocumentStore with citations.
+        Orchestrates small, well-named helpers for clarity.
+        """
+        recent_outputs = self._recent_tool_outputs(state)
+        if not recent_outputs:
+            self._log.debug("No last tool call outputs, skipping analysis")
+            return DocumentStore()
+
+        tool_arguments = self._extract_tool_arguments(state, count=len(recent_outputs))
+        documents = self._documents_from_tool_outputs(recent_outputs)
+        return self._format_and_call_analyze(state, documents, tool_arguments)
+
+    # ---- _llm_analyze helpers ----
+    def _recent_tool_outputs(self, state: Dict[str, Any]) -> List[AIMessage]:
+        """Slice the last N tool outputs based on LAST_TOOL_CALL_COUNT."""
+        tool_last_output: List[AIMessage] = state.get(StateKeys.TOOL_LAST_OUTPUT, [])
+        last_tool_call_count: int = state.get(StateKeys.LAST_TOOL_CALL_COUNT, 1)
+        if not tool_last_output:
+            return []
+        if last_tool_call_count <= 0:
+            return []
+        if len(tool_last_output) >= last_tool_call_count:
+            recent = tool_last_output[-last_tool_call_count:]
+        else:
+            recent = tool_last_output
+        self._log.debug("Analyzing %d recent tool call outputs", len(recent))
+        return recent
+
+    def _extract_tool_arguments(self, state: Dict[str, Any], count: int) -> List[str]:
+        """Collect the textual arguments (queries) that produced the last tool calls."""
+        ai_queries: List[AIMessage] = state.get(StateKeys.AI_QUERIES, [])
+        if not ai_queries:
+            return []
+        last_ai = ai_queries[-1]
+        args: List[str] = []
+        if getattr(last_ai, "tool_calls", None):
+            actual = last_ai.tool_calls[:count]
+            for i, tc in enumerate(actual, 1):
+                q = tc.get("args", {}).get("query", "")
+                args.append(f"Search {i}: {q}")
+        else:
+            args.append("No tool call arguments found")
+        return args
+
+    def _documents_from_tool_outputs(self, outputs: List[AIMessage]) -> DocumentStore:
+        """Parse tool outputs (JSON in message.content) and merge into a DocumentStore."""
+        stores: List[DocumentStore] = []
+        for msg in outputs:
+            try:
+                payload = json.loads(msg.content)
+                stores.append(DocumentStore.add_documents_from_tavily(payload))
+            except Exception as e:
+                self._log.warning("Failed to parse tool output as JSON: %s", e)
+        return DocumentStore.merge(stores) if stores else DocumentStore()
+
+    def _format_and_call_analyze(
+        self,
+        state: Dict[str, Any],
+        documents: DocumentStore,
+        tool_arguments: List[str],
+    ) -> DocumentStore:
+        """Build analyze prompt and call the structured LLM; return recreated DocumentStore."""
+        tool_context = {
+            "last_tool_call_arguments": json.dumps(tool_arguments),
+            "last_tool_call_output": documents.get_document_content_as_str(),
+        }
+        format_ctx = self._apply_state_mapping(state, self.config.state_field_mapping, tool_context)
+        prompt = self.config.analyze_prompt.format(**format_ctx)
+
+        output_format_prompt = (
+            """
+            All returned insights should have citations to the source documents. 
+            Document all have after their content [ref:document_id].
+            Return you output as a list of Facts. Each fact has content write as instructed in the beginning of the prompt, 
+            and a document_id field with the source document id.
+        """
         )
-        
-        return {
-            "final_output": final_output,
-            "ai_queries": [AIMessage(content="no more searches")]
+        llm_with_format = self.llm.with_structured_output(SourcedFactsList)
+        result = llm_with_format.invoke(prompt + output_format_prompt)
+        return documents.recreate_from_sourced_facts(result)
+
+    def _create_search_tool_calls_if_needed(self, state: Dict[str, Any], analysis_docs: DocumentStore) -> RequestMoreSearches | FinishWithDocuments:
+        """Generate new searches or decide to stop; respects limits."""
+        tool_saved_info: DocumentStore = state.get(StateKeys.TOOL_SAVED_INFO) or DocumentStore()
+        ai_queries: List[AIMessage] = state.get(StateKeys.AI_QUERIES, [])
+
+        search_limits = state.get(StateKeys.SEARCH_LIMITS)
+
+        max_searches, concurrent_count = self._limits_for_component(search_limits, self.config.component_name)
+        if self._should_stop_searching(len(ai_queries), max_searches):
+            self._log.debug("Reached max searches (%s). Formatting final output.", max_searches)
+            return FinishWithDocuments(final_output=self._llm_format(state, analysis_docs, tool_saved_info))
+
+        # Build context
+        used = len(ai_queries)
+        search_limit_text = (
+            f"- Max {max_searches} searches for this task. You already used {used} searches."
+            if used > 0
+            else f"- Use a MAX of {max_searches} searches for this task, ideally fewer."
+        )
+        prior_queries = []
+        for msg in ai_queries:
+            try:
+                prior_queries.append(msg.tool_calls[0].get("args", {}).get("query", ""))
+            except Exception:
+                prior_queries.append("")
+
+        search_context = {
+            "tool_saved_info": json.dumps(
+                tool_saved_info.get_document_content_as_str() + analysis_docs.get_document_content_as_str()
+            ),
+            "ai_queries": json.dumps(prior_queries),
+            "len_ai_queries": used,
+            "search_limit_text": search_limit_text,
+            "concurrent_searches": concurrent_count,
         }
 
+        format_ctx = self._apply_state_mapping(state, self.config.state_field_mapping, search_context)
+        prompt = self.config.search_prompt.format(**format_ctx)
+
+        # Execute with retry (LLM with tools)
+        result_search_query: Optional[AIMessage] = retry_llm_tool_call(self.llm_with_tools, prompt)
+        if result_search_query is None:
+            self._log.warning("All retry attempts failed for tool call. Formatting final output.")
+            return FinishWithDocuments(final_output=self._llm_format(state, analysis_docs, tool_saved_info))
+
+        actual_tool_call_count = len(getattr(result_search_query, "tool_calls", []) or [])
+        if actual_tool_call_count > 0:
+            self._log.debug("Prepared %d parallel search queries", actual_tool_call_count)
+            return RequestMoreSearches(
+                ai_query=result_search_query,
+                last_tool_call_count=actual_tool_call_count,
+                tool_saved_info=analysis_docs,
+            )
+
+        # No tool calls → proceed to format
+        return FinishWithDocuments(final_output=self._llm_format(state, analysis_docs, tool_saved_info))
+
+    def _llm_format(
+        self,
+        state: Dict[str, Any],
+        analysis_docs: DocumentStore,
+        serializable_tool_info: DocumentStore,
+    ) -> DocumentStore:
+        serializable_tool_info = serializable_tool_info or DocumentStore()
+
+        final_context = {
+            "tool_saved_info": serializable_tool_info.get_document_content_as_str()
+            + analysis_docs.get_document_content_as_str(),
+        }
+        format_ctx = self._apply_state_mapping(state, self.config.state_field_mapping, final_context)
+        prompt = self.config.format_prompt.format(**format_ctx)
+
+        output_format_prompt = (
+            "\nAll returned insights should have citations to the source documents. "
+            "Document all have after their content [ref:document_id].\n"
+            "Return you output as a list of Facts. Each fact has content write as instructed in the beginning of the prompt, "
+            "and a document_id field with the source document id.\n"
+        )
+        llm_with_format = self.llm.with_structured_output(SourcedFactsList)
+        result = llm_with_format.invoke(prompt + output_format_prompt)
+
+        merged = serializable_tool_info + analysis_docs
+        return merged.recreate_from_sourced_facts(result)
+
+    # ---- Helpers ----
+    @staticmethod
+    def _apply_state_mapping(
+        state: Dict[str, Any], mapping: Dict[str, str], extra: Optional[Dict[str, Any]] = None
+    ) -> Dict[str, str]:
+        ctx: Dict[str, str] = {}
+        for template_key, state_key in mapping.items():
+            value = state.get(state_key, "")
+            if isinstance(value, list):
+                ctx[template_key] = " ,".join(str(v) for v in value)
+            else:
+                ctx[template_key] = str(value)
+        if extra:
+            ctx.update({k: str(v) for k, v in extra.items()})
+        return ctx
+
+    @staticmethod
+    def _limits_for_component(search_limits, component_name: str) -> Tuple[int, int]:
+        """Return (max_searches, concurrent_count)."""
+        component_to_max = {
+            "product_exploration": search_limits.product_exploration_max_searches,
+            "product_research": search_limits.product_research_max_searches,
+            "final_product_info": search_limits.final_product_info_max_searches,
+        }
+        component_to_concurrent = {
+            "product_exploration": search_limits.product_exploration_concurrent_searches,
+            "product_research": search_limits.product_research_concurrent_searches,
+            "final_product_info": search_limits.final_product_info_concurrent_searches,
+        }
+        return component_to_max.get(component_name, 3), component_to_concurrent.get(component_name, 3)
+
+    @staticmethod
+    def _should_stop_searching(used: int, max_allowed: int) -> bool:
+        return used >= max_allowed
+
+
+# ====== Thin, drop-in compatible function (same name & outputs) ======
+
+def execute_search_pattern_flexible(
+    state: Dict[str, Any],
+    llm,
+    llm_with_tools,
+    config: SearchConfig,
+) -> Dict[str, Any]:
+    """Backward-compatible adapter around FlexibleSearchRunner.run()."""
+    runner = FlexibleSearchRunner(llm=llm, llm_with_tools=llm_with_tools, config=config)
+    return runner.run(state)
