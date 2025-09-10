@@ -18,6 +18,7 @@ DEEP_SEARCH_FORMAT_PROMPT = """
         - Use ALL the information you have in tool_saved_info - we worked hard gathering it, preserve ALL details found.
         - For each criteria, include ALL relevant information found: specific data points, user experiences, expert opinions, test results, measurements, etc.
         - If answer to a criteria is not found, return "unknown" for that criteria.
+        - There should be fact for each criteria, even if the fact is "unknown".
 
         Return your output as a comprehensive assessment for each criterion, preserving ALL relevant details and context found.
         </INSTRUCTIONS>

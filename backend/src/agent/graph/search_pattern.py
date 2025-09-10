@@ -200,28 +200,54 @@ class FlexibleSearchRunner:
         max_searches, concurrent_count = self._limits_for_component(search_limits, self.config.component_name)
         if self._should_stop_searching(len(ai_queries), max_searches):
             self._log.debug("Reached max searches (%s). Formatting final output.", max_searches)
-            return FinishWithDocuments(final_output=self._llm_format(state, analysis_docs, tool_saved_info))
+            return FinishWithDocuments(final_output=self._format_all_findings_into_desired_schema(state, analysis_docs, tool_saved_info))
+        
+        number_of_used_ai_queries = len(ai_queries)
+        search_limit_text = self._get_search_limit_text(number_of_used_ai_queries, max_searches)
+        prior_queries = self._get_prior_queries(ai_queries)
 
-        # Build context
-        used = len(ai_queries)
-        search_limit_text = (
+        result_search_query = self._execute_search_generation(state, analysis_docs, tool_saved_info, concurrent_count, search_limit_text, prior_queries, number_of_used_ai_queries)
+
+        if result_search_query:
+            actual_tool_call_count = len(getattr(result_search_query, "tool_calls", []) or [])
+            if actual_tool_call_count > 0:
+                self._log.debug("Prepared %d parallel search queries", actual_tool_call_count)
+                return RequestMoreSearches(
+                    ai_query=result_search_query,
+                    last_tool_call_count=actual_tool_call_count,
+                    tool_saved_info=analysis_docs,
+                )
+        else:
+            self._log.warning("All retry attempts failed for tool call. Formatting final output.")
+        # No tool calls → proceed to format
+        return FinishWithDocuments(final_output=self._format_all_findings_into_desired_schema(state, analysis_docs, tool_saved_info))
+
+    def _get_search_limit_text(self, used: int, max_searches: int) -> str:
+        """Generate search limit text based on usage."""
+        return (
             f"- Max {max_searches} searches for this task. You already used {used} searches."
             if used > 0
             else f"- Use a MAX of {max_searches} searches for this task, ideally fewer."
         )
+
+    def _get_prior_queries(self, ai_queries: List[AIMessage]) -> List[str]:
+        """Extract prior query strings from AI messages."""
         prior_queries = []
         for msg in ai_queries:
             try:
                 prior_queries.append(msg.tool_calls[0].get("args", {}).get("query", ""))
             except Exception:
                 prior_queries.append("")
+        return prior_queries
+
+    def _execute_search_generation(self, state: Dict[str, Any], analysis_docs: DocumentStore, tool_saved_info: DocumentStore, concurrent_count: int, search_limit_text: str, prior_queries: List[str],  number_of_used_ai_queries: int) -> RequestMoreSearches | FinishWithDocuments:
 
         search_context = {
             "tool_saved_info": json.dumps(
                 tool_saved_info.get_document_content_as_str() + analysis_docs.get_document_content_as_str()
             ),
             "ai_queries": json.dumps(prior_queries),
-            "len_ai_queries": used,
+            "len_ai_queries": number_of_used_ai_queries,
             "search_limit_text": search_limit_text,
             "concurrent_searches": concurrent_count,
         }
@@ -231,23 +257,12 @@ class FlexibleSearchRunner:
 
         # Execute with retry (LLM with tools)
         result_search_query: Optional[AIMessage] = retry_llm_tool_call(self.llm_with_tools, prompt)
-        if result_search_query is None:
-            self._log.warning("All retry attempts failed for tool call. Formatting final output.")
-            return FinishWithDocuments(final_output=self._llm_format(state, analysis_docs, tool_saved_info))
 
-        actual_tool_call_count = len(getattr(result_search_query, "tool_calls", []) or [])
-        if actual_tool_call_count > 0:
-            self._log.debug("Prepared %d parallel search queries", actual_tool_call_count)
-            return RequestMoreSearches(
-                ai_query=result_search_query,
-                last_tool_call_count=actual_tool_call_count,
-                tool_saved_info=analysis_docs,
-            )
+        return result_search_query
 
-        # No tool calls → proceed to format
-        return FinishWithDocuments(final_output=self._llm_format(state, analysis_docs, tool_saved_info))
+        
 
-    def _llm_format(
+    def _format_all_findings_into_desired_schema(
         self,
         state: Dict[str, Any],
         analysis_docs: DocumentStore,
@@ -292,18 +307,25 @@ class FlexibleSearchRunner:
 
     @staticmethod
     def _limits_for_component(search_limits, component_name: str) -> Tuple[int, int]:
-        """Return (max_searches, concurrent_count)."""
-        component_to_max = {
-            "product_exploration": search_limits.product_exploration_max_searches,
-            "product_research": search_limits.product_research_max_searches,
-            "final_product_info": search_limits.final_product_info_max_searches,
-        }
-        component_to_concurrent = {
-            "product_exploration": search_limits.product_exploration_concurrent_searches,
-            "product_research": search_limits.product_research_concurrent_searches,
-            "final_product_info": search_limits.final_product_info_concurrent_searches,
-        }
-        return component_to_max.get(component_name, 3), component_to_concurrent.get(component_name, 3)
+        """Return (max_searches, concurrent_count) using match for clarity."""
+        match component_name:
+            case "product_exploration":
+                return (
+                    search_limits.product_exploration_max_searches,
+                    search_limits.product_exploration_concurrent_searches,
+                )
+            case "product_research":
+                return (
+                    search_limits.product_research_max_searches,
+                    search_limits.product_research_concurrent_searches,
+                )
+            case "final_product_info":
+                return (
+                    search_limits.final_product_info_max_searches,
+                    search_limits.final_product_info_concurrent_searches,
+                )
+            case _:
+                raise ValueError(f"Unknown component name: {component_name}")
 
     @staticmethod
     def _should_stop_searching(used: int, max_allowed: int) -> bool:
