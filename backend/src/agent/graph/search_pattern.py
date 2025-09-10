@@ -16,6 +16,7 @@ import logging
 from pydantic import BaseModel, Field
 from agent.configuration.search_limits import ComponentNames
 from agent.citation.document import Document, DocumentStore, SourcedFact, SourcedFactsList, reduce_documents
+from agent.graph.retry_utils import retry_llm_tool_call
 
 
 # Base state that all search subgraphs will extend
@@ -44,11 +45,6 @@ class SearchConfig(BaseModel):
             "final_product_info": search_limits.final_product_info_max_searches,
         }
         return component_limits.get(self.component_name, 3)
-
-
-class AnalysisResult(BaseModel):
-    """Your exact tool call analysis structure"""
-    insights: List[str] = Field(description="List of key insights extracted from the tool call")
 
 
 def apply_state_mapping(state: Dict[str, Any], 
@@ -85,80 +81,6 @@ def apply_state_mapping(state: Dict[str, Any],
     return format_context
 
 
-def retry_llm_tool_call(llm_with_tools, formatted_prompt: str, max_retries: int = 3):
-    """
-    Retry wrapper for LLM tool calls that handles validation errors.
-    
-    Args:
-        llm_with_tools: The LLM instance bound to tools
-        formatted_prompt: The formatted prompt to send
-        max_retries: Maximum number of retry attempts
-        
-    Returns:
-        The LLM response or None if all retries fail
-    """
-    logger = logging.getLogger(__name__)
-    
-    for attempt in range(max_retries + 1):
-        try:
-            logger.info(f"Attempting tool call (attempt {attempt + 1}/{max_retries + 1})")
-            result = llm_with_tools.invoke(formatted_prompt)
-            logger.info("Tool call succeeded")
-            return result
-            
-        except Exception as e:
-            error_msg = str(e).lower()
-            
-            # Check if it's a tool validation error
-            is_validation_error = any(keyword in error_msg for keyword in [
-                'tool call validation failed',
-                'parameters for tool',
-                'did not match schema',
-                'expected boolean, but got string',
-                'badrequest'
-            ])
-            
-            if is_validation_error and attempt < max_retries:
-                logger.warning(f"Tool validation failed (attempt {attempt + 1}): {str(e)}")
-                
-                # Create a simpler prompt for retry
-                if attempt == 0:
-                    # First retry: Add explicit instructions about parameter types
-                    retry_prompt = formatted_prompt + """\n\nIMPORTANT: When calling tools:
-                    - Use boolean values (true/false), NOT strings ("true"/"false")
-                    - Only use valid tool parameters
-                    - For TavilySearch: valid boolean params are include_answer, include_raw_content, include_images, include_image_descriptions
-                    - Example: {"query": "search term", "include_images": true}"""
-                    
-                elif attempt == 1:
-                    # Second retry: Use basic search only
-                    retry_prompt = f"""Based on this context, generate a simple web search query using only the 'query' parameter.
-                    
-                        Context: {formatted_prompt}
-
-                        Generate a Tavily search tool call with ONLY the query parameter. Example:
-                        {{"query": "your search term here"}}
-
-                        Do not use any other parameters like include_images, search_depth, etc."""
-                formatted_prompt = retry_prompt
-                
-                # Exponential backoff
-                if attempt > 0:
-                    sleep_time = 2 ** (attempt - 1)
-                    logger.info(f"Waiting {sleep_time}s before retry...")
-                    time.sleep(sleep_time)
-                    
-            else:
-                # Either not a validation error, or we've exhausted retries
-                if attempt >= max_retries:
-                    logger.error(f"All retry attempts failed. Final error: {str(e)}")
-                    return None
-                else:
-                    # Non-validation error - don't retry
-                    logger.error(f"Non-validation error, not retrying: {str(e)}")
-                    raise e
-    
-    return None
 
 
 def step1_analyze_last_tool_call(state: Dict[str, Any], 
