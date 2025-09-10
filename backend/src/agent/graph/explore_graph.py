@@ -11,8 +11,8 @@ from agent.configuration.search_limits import SearchLimitsConfig
 
 
 
-from typing import List
-from typing import Annotated
+
+from typing import Any, Dict, List, Optional, Tuple, TypedDict, Annotated
 from langgraph.graph import StateGraph, START, END
 from langgraph.graph.message import add_messages
 
@@ -25,12 +25,20 @@ from agent.graph.deep_search_graph import research_graph_with_pattern
 from agent.prompts.exploration.explore_analyze_prompt import EXPLORE_ANALYZE_PROMPT
 from agent.prompts.exploration.explore_search_prompt import EXPLORE_SEARCH_PROMPT
 from agent.prompts.exploration.explore_format_prompt import EXPLORE_FORMAT_PROMPT
+from agent.prompts.exploration.formulate_as_products import FORMULATE_AS_PRODUCTS_PROMPT
+from agent.citation.document import DocumentStore
+from agent.citation.dummy_documents import DUMMY_DOCUMENTS
+from agent.configuration.search_limits import Low
+from pydantic import BaseModel, Field
 
 #set_debug(True)
 #set_verbose(True)
 
 
-
+class DeepSearchResult(TypedDict):
+    product_id: str = Field(description="The unique identifier of the product being evaluated.")
+    evaluation: DocumentStore = Field(description="The detailed evaluation of the product based on the provided criteria.")
+    status: str = Field(description="The status of the evaluation, e.g., 'success' or 'failure'.")
 
 class State(BaseSearchState):
     query: str
@@ -38,15 +46,10 @@ class State(BaseSearchState):
     criteria: List[str]
     messages_explore: Annotated[list, add_messages]
     products: List[ProductSimple]
-    research_results: List[str]
+    research_results: List[DeepSearchResult]
     effort: str  # "low", "medium", "high" - controls search configuration via SearchLimitsConfig
     search_limits: SearchLimitsConfig
     
-    # BaseSearchState provides:
-    # ai_queries: Annotated[List[AIMessage], add_messages]
-    # tool_saved_info: Annotated[List[str], add_messages]
-    # tool_last_output: List[AIMessage]
-    # final_output: str
 
 # Create Tavily instance with centralized configuration
 # Dynamic tool orchestrator for product exploration
@@ -89,8 +92,6 @@ def chatbot_explore(state: State):
         config=config
     )
 
- 
-
 
 def route_tools(state: State):
     """Route based on ai_queries for search pattern"""
@@ -104,18 +105,13 @@ def format_products(state: State):
     
     llm_with_structured_output = get_llm("product_exploration").with_structured_output(ProductSimpleList)
     max_products = state.get("max_explore_products", 15)
-    
-    result = llm_with_structured_output.invoke(f"""
-    Extract and format the product list from this text into the required structure.
-    PRESERVE ALL INFORMATION - do not summarize, shorten, or lose any details.
-    Keep maximum {max_products} products based on relevance to query: {state.get("query", "")}
-    For each product, include ALL available information in the appropriate fields.
-    ONLY Look for specific product models, DO not choose a product if it is just a category or brand. Wrong example: Smartphone-based sEMG. Correct example: Spren Body Composition Scanner - Pro ios app.  
-
-    
-    Text to process:
-    {final_output}
-    """)
+    final_output_str = final_output.get_document_content_as_str()
+    formatted_prompt = FORMULATE_AS_PRODUCTS_PROMPT.format(
+        final_output=final_output_str,
+        max_products=max_products,
+        query=state.get("query", "")
+    )
+    result = llm_with_structured_output.invoke(formatted_prompt)
 
     return {
         "products": [{
@@ -131,7 +127,7 @@ def call_product_research_tool(state: State):
     from langchain_core.runnables import RunnableWithFallbacks, RunnableLambda
     
     crit = state.get("criteria", [])
-    inputs = [{"product": p, "criteria": crit} for p in state.get("products", [])]
+    inputs = [{"product": p, "criteria": crit, "search_limits": state.get("search_limits", {})} for p in state.get("products", [])]
 
     # Create fallback that returns error state instead of failing
     def error_fallback(input_data):
@@ -165,17 +161,29 @@ def call_product_research_tool(state: State):
     eval_results = [s.get("final_output") for s in state_list]
     results = []
     for product, eval_result in zip(state.get("products", []), eval_results):
-        if isinstance(eval_result, str):
-            results.append({
-                "product_id": product.get("id", "Unknown Product"),
-                "evaluation": eval_result,
-                "status": "error" if eval_result.startswith("Error:") else "success"
-            })
-    
+        results.append({
+            "product_id": product.get("id", "Unknown Product"),
+            "evaluation": eval_result,
+            "status": "error" if not isinstance(eval_result, DocumentStore) else "success"
+        })
+
     return {"research_results": results}
 
 
+def call_product_research_tool_fake(state: State):
 
+    return {"research_results": [{
+                "product_id": "fitbit-charge-6",
+                "evaluation": DUMMY_DOCUMENTS,
+                "status": "success"
+            }, 
+            {
+                "product_id": "apple-watch-series-9",
+                "evaluation": DUMMY_DOCUMENTS,
+                "status": "success"
+            }
+        ]
+    }
 
 
 graph_builder = StateGraph(State)
@@ -218,7 +226,8 @@ if __name__ == "__main__":
         #"are sleep tracking rings worth buying?",  
         #"are high end sleep tracking rings worth the price?"  
         ],
-        "max_explore_products": 2
+        "max_explore_products": 2,
+        "search_limits": Low()
         }
         ):
             print("Event", event.keys())

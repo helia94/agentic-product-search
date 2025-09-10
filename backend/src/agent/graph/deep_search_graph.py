@@ -30,6 +30,7 @@ from agent.prompts.deep_search.deep_search_analyze_prompt import DEEP_SEARCH_ANA
 from agent.prompts.deep_search.deep_search_format_prompt import DEEP_SEARCH_FORMAT_PROMPT
 from agent.prompts.deep_search.deep_search_search_prompt import DEEP_SEARCH_SEARCH_PROMPT
 from agent.configuration.search_limits import Low
+from agent.citation.document import DocumentStore
 set_debug(True)
 
 
