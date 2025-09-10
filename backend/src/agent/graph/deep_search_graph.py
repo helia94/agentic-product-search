@@ -41,12 +41,6 @@ class ProductResearchState(BaseSearchState):
     criteria: List[str]
     product: ProductSimple
     search_limits: SearchLimitsConfig
-    
-    # BaseSearchState provides:
-    # ai_queries: Annotated[List[AIMessage], add_messages]
-    # tool_saved_info: Annotated[List[str], add_messages]
-    # tool_last_output: List[AIMessage]
-    # final_output: str
 
 # Dynamic tool orchestrator for product research
 tools_orchestrator = DynamicTavilyToolOrchestrator(
